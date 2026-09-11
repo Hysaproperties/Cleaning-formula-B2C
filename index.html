@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<!--
+  Klárt (Vaskingen) · Prisberegner for privatkunder / B2C
+  Version 1.2.0 — 2026-09-10
+
+  Bygget videre på Hýsa-rengørings-prisberegneren, men til private kunder.
+  Samme rejsezoner, tunneller og bemandingsregler er genbrugt fra
+  B2B-versionen. Kun én rengøringstype: heima vask (flytterengøring og
+  skraldetømning er fjernet fra denne version). Engangsvask eller fast
+  aftale, med hyppighed/ugedag/klokkeslæt ved faste aftaler. Tillæg for
+  hovedrengøring (engangsvask), akut bestilling, sengetøj (vask/opredning
+  pr. person), og et tidstillæg efter kl. 16 og i weekenden.
+
+  Alle priser og procentsatser i "Tillæg og rabat"-panelet er PLACEHOLDERE
+  og skal godkendes, før værktøjet bruges til rigtige tilbud.
+  Single self-contained file: no build step, no dependencies.
+-->
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Klárt · Prisberegner for privatkunder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0E2A3A; --ink-soft:#4A6674; --ink-faint:#7D949E;
+  --canvas:#E7EDEF; --surface:#FFFFFF; --surface-2:#F4F7F8;
+  --line:#C7D5DB; --line-soft:#DDE6EA;
+  --teal:#0F7D8C; --teal-deep:#0A5C68;
+  --amber:#9C6206; --amber-bg:#FDF3E0;
+  --red:#A03028; --red-bg:#FBECEA;
+  --green:#1B6E47; --green-bg:#E8F3ED;
+  --sans:'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:var(--sans);background:var(--canvas);color:var(--ink);
+  font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+
+.mast{background:var(--ink);color:#EAF2F4;padding:18px 24px;position:sticky;top:0;z-index:40}
+.mast-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px}
+.mast h1{font-size:19px;font-weight:600;margin:0;letter-spacing:-0.01em}
+.mast .sub{color:#8FB0BB;font-size:13px}
+.mast-tools{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tbtn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#EAF2F4;
+  border-radius:5px;padding:5px 11px;cursor:pointer;font-size:13px}
+.tbtn:hover{background:rgba(255,255,255,.16)}
+.tbtn.on{background:var(--teal);border-color:var(--teal)}
+.langs{display:flex;border:1px solid rgba(255,255,255,.22);border-radius:5px;overflow:hidden}
+.langs button{background:transparent;border:0;border-right:1px solid rgba(255,255,255,.16);
+  color:#B9CFD6;padding:5px 11px;cursor:pointer;font-size:12.5px;font-weight:500;letter-spacing:.03em}
+.langs button:last-child{border-right:0}
+.langs button:hover{background:rgba(255,255,255,.1);color:#EAF2F4}
+.langs button.on{background:#EAF2F4;color:var(--ink);font-weight:600}
+
+.shell{display:grid;grid-template-columns:330px minmax(0,1fr);gap:20px;padding:20px 24px 60px;align-items:start}
+@media(max-width:1000px){.shell{grid-template-columns:1fr}}
+
+.rail{position:sticky;top:92px;max-height:calc(100vh - 112px);overflow-y:auto;padding-right:4px}
+@media(max-width:1000px){.rail{position:static;max-height:none}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:7px;margin-bottom:12px;overflow:hidden}
+.panel.edit{border-color:var(--teal)}
+.panel > h2{margin:0;font-size:13.5px;font-weight:600;padding:10px 13px;background:var(--surface-2);
+  border-bottom:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;user-select:none;gap:8px}
+.panel.edit > h2{background:#EAF5F6}
+.panel > h2 .chev{color:var(--ink-faint);font-size:11px;transition:transform .15s;flex:none}
+.panel.closed > h2 .chev{transform:rotate(-90deg)}
+.panel.closed .pbody{display:none}
+.pbody{padding:10px 13px 12px}
+.note{font-size:12px;color:var(--ink-soft);margin:0 0 8px;line-height:1.45}
+.note a{color:var(--teal-deep)}
+.locknote{font-size:11.5px;color:var(--ink-faint);margin:0 0 10px;line-height:1.4;
+  padding:7px 9px;background:var(--surface-2);border-radius:5px;border:1px solid var(--line-soft)}
+
+.plist{width:100%;border-collapse:collapse;font-size:12.5px}
+.plist td{padding:4px 0;border-bottom:1px solid var(--line-soft);color:var(--ink-soft);vertical-align:top}
+.plist td:last-child{text-align:right;font-weight:600;color:var(--ink);white-space:nowrap;padding-left:10px}
+.plist tr:last-child td{border-bottom:0}
+.plist .sm{display:block;font-size:11.5px;color:var(--ink-faint)}
+
+.row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.row label{flex:1;font-size:13px;color:var(--ink-soft)}
+.row input[type=number]{width:86px;padding:5px 7px;border:1px solid var(--line);border-radius:4px;
+  background:var(--surface);text-align:right}
+input.flag{background:#FFF8E6;border-color:#E3C067;font-weight:600}
+textarea{width:100%;min-height:74px;padding:7px 8px;border:1px solid var(--line);border-radius:5px;
+  background:var(--surface);resize:vertical;font-size:12.5px;line-height:1.4}
+.btnrow{display:flex;gap:7px;margin-top:7px}
+.sbtn{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:6px 9px;
+  cursor:pointer;font-size:12.5px;color:var(--ink)}
+.sbtn:hover{border-color:var(--teal);color:var(--teal-deep)}
+.msg{font-size:11.5px;margin-top:7px;min-height:1em;color:var(--teal-deep)}
+.msg.bad{color:var(--red)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-bottom:16px}
+.card > h2{margin:0;font-size:14px;font-weight:600;padding:11px 15px;background:var(--surface-2);
+  border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.card > h2 span.s{font-weight:400;font-size:12.5px;color:var(--ink-faint)}
+
+.inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;padding:16px 15px}
+.inputs .span2{grid-column:span 2}
+@media(max-width:520px){.inputs .span2{grid-column:span 1}}
+.fld label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px}
+.fld input,.fld select{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:5px;background:var(--surface)}
+.fld input[type=number]{text-align:right}
+.fld .u{font-size:11.5px;color:var(--ink-faint);margin-top:4px;display:block;min-height:1.1em;line-height:1.3}
+.fld .u.est{color:var(--amber)}
+.fld.tick{display:flex;align-items:center;gap:8px;padding-top:18px}
+.fld.tick input{width:17px;height:17px;accent-color:var(--teal);padding:0;flex:none}
+.fld.tick label{margin:0;font-size:13px;color:var(--ink)}
+.fld.hide{display:none}
+
+.result{display:grid;grid-template-columns:minmax(230px,290px) minmax(0,1fr);border-top:1px solid var(--line)}
+@media(max-width:760px){.result{grid-template-columns:1fr}}
+.bigbox{background:var(--ink);color:#EAF2F4;padding:22px 20px;display:flex;flex-direction:column;justify-content:center}
+.bigbox .lbl{font-size:12px;color:#8FB0BB}
+.bigbox .amt{font-size:44px;font-weight:700;letter-spacing:-0.03em;line-height:1.05;margin:2px 0 1px}
+.bigbox .amt small{font-size:18px;font-weight:500;margin-left:5px;color:#B9CFD6}
+.bigbox .alt{font-size:13px;color:#8FB0BB;margin-top:7px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--line-soft)}
+.kpi{background:var(--surface);padding:14px 15px}
+.kpi .k{font-size:11.5px;color:var(--ink-soft)}
+.kpi .v{font-size:20px;font-weight:600;letter-spacing:-0.02em;line-height:1.25}
+.kpi .v small{font-size:12px;font-weight:400;color:var(--ink-faint);margin-left:3px}
+.kpi .v.sm{font-size:14.5px}
+.kpi .v.g{color:var(--green)} .kpi .v.y{color:var(--amber)} .kpi .v.r{color:var(--red)}
+
+.bd{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:28px;padding:18px 15px}
+.bd h4{margin:0 0 10px;font-size:12.5px;font-weight:600;color:var(--ink-soft)}
+.bd dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:5px 14px;font-size:13.5px}
+.bd dt{color:var(--ink-soft)}
+.bd dd{margin:0;text-align:right}
+.bd dd.neg{color:var(--green)}
+.bd .tot{display:contents}
+.bd .tot dt,.bd .tot dd{font-weight:700;border-top:1px solid var(--line);padding-top:8px;margin-top:4px;color:var(--ink);font-size:15px}
+.bar{height:10px;background:#E3EBEE;border-radius:5px;overflow:hidden;margin:14px 0 6px;display:flex}
+.bar span{display:block;height:100%}
+.bar .cost{background:var(--ink-soft)} .bar .gm{background:var(--teal)}
+.leg{font-size:12px;color:var(--ink-soft);display:flex;gap:16px;flex-wrap:wrap}
+.leg b{font-weight:600;color:var(--ink)}
+.incl{padding:11px 15px;border-top:1px solid var(--line-soft);background:var(--surface-2);font-size:12.5px;color:var(--ink-soft)}
+.flagbox{margin:0 15px 16px;padding:10px 12px;background:var(--amber-bg);border:1px solid #EBD5A8;
+  border-radius:6px;font-size:12.5px;color:var(--amber);display:none}
+.flagbox.on{display:block}
+
+.tilegroup{padding:4px 15px 14px}
+.tg-title{margin:0 0 8px;font-size:12px;color:var(--ink-soft);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}
+.tile{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:var(--surface);
+  cursor:pointer;text-align:left;font-family:inherit}
+.tile:hover{border-color:var(--teal)}
+.tile .tn{display:block;font-weight:600;font-size:13.5px;color:var(--ink)}
+.tile .tp{display:block;font-size:11.5px;color:var(--ink-faint);margin-top:2px;letter-spacing:.02em}
+.tile.sel{background:var(--ink);border-color:var(--ink)}
+.tile.sel .tn{color:#EAF2F4}
+.tile.sel .tp{color:#9DBAC3;text-transform:uppercase;font-weight:600}
+
+.foot{color:var(--ink-soft);font-size:12.5px;max-width:820px;padding:0 2px}
+.foot ul{margin:6px 0 0;padding-left:18px}
+.foot li{margin-bottom:4px}
+.foot a{color:var(--teal-deep)}
+
+@media print{
+  .mast{position:static}.mast-tools,.foot{display:none}
+  .shell{grid-template-columns:1fr;padding:0}body{background:#fff}
+  .rail{position:static;max-height:none}
+  .bigbox{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .bigbox .lbl,.bigbox .alt{color:var(--ink-soft)}
+}
+/* ---- adgangslås ---- */
+#gate{position:fixed;inset:0;z-index:100;background:var(--ink);
+  display:flex;align-items:center;justify-content:center;padding:24px}
+#gate.off{display:none}
+body.locked{overflow:hidden}
+.gatebox{width:100%;max-width:330px;text-align:center;color:#EAF2F4}
+.gatebox .mark{width:46px;height:46px;margin:0 auto 18px;border:2px solid #3F6273;
+  border-radius:11px;display:flex;align-items:center;justify-content:center}
+.gatebox h2{font-size:23px;font-weight:600;margin:0 0 4px;letter-spacing:-0.015em}
+.gatebox p{font-size:13px;color:#8FB0BB;margin:0 0 24px}
+#gatePw{width:100%;padding:11px 13px;border:1px solid #3A5A6A;border-radius:6px;
+  background:#12313F;color:#EAF2F4;text-align:center;letter-spacing:.14em}
+#gatePw::placeholder{color:#6B8A98;letter-spacing:normal}
+#gatePw:focus{border-color:var(--teal)}
+#gateBtn{width:100%;margin-top:10px;padding:11px;border:0;border-radius:6px;
+  background:var(--teal);color:#fff;font-weight:600;cursor:pointer;font-size:14px}
+#gateBtn:hover{background:#12909F}
+#gateErr{min-height:1.3em;margin-top:13px;font-size:12.5px;color:#E0705F}
+.shake{animation:shake .32s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}
+  60%{transform:translateX(7px)}80%{transform:translateX(-3px)}}
+@media print{#gate{display:none!important}}
+
+@media(prefers-reduced-motion:reduce){*{transition:none!important}.shake{animation:none}}
+</style>
+</head>
+<body class="locked">
+
+<div id="gate">
+  <div class="gatebox">
+    <div class="mark">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#8FB0BB" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+    </div>
+    <h2>Klárt</h2>
+    <p>Prisberegner for privatkunder</p>
+    <input type="password" id="gatePw" placeholder="Adgangskode" autocomplete="current-password"
+           autocapitalize="off" spellcheck="false">
+    <button id="gateBtn" type="button">Lås op</button>
+    <div id="gateErr" role="alert"></div>
+  </div>
+</div>
+
+<header class="mast">
+  <div class="mast-top">
+    <h1 data-t="appTitle"></h1>
+    <span class="sub" id="vatlbl"></span>
+    <div class="mast-tools">
+      <div class="langs" id="langs">
+        <button data-lang="da" class="on">DA</button>
+        <button data-lang="en">EN</button>
+        <button data-lang="fo">FO</button>
+      </div>
+      <button class="tbtn" id="vatBtn"></button>
+      <button class="tbtn" id="copyBtn"></button>
+      <button class="tbtn" id="saveBtn"></button>
+      <label class="tbtn" style="margin:0"><span data-t="load"></span><input type="file" id="loadInp" accept=".json" hidden></label>
+      <button class="tbtn" id="printBtn"></button>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+
+  <aside class="rail">
+    <p class="locknote" data-t="lockNote"></p>
+
+    <section class="panel">
+      <h2><span data-t="pBase"></span><span class="chev">▾</span></h2>
+      <div class="pbody"><table class="plist" id="tBase"></table></div>
+    </section>
+
+    <section class="panel">
+      <h2><span data-t="pZones"></span><span class="chev">▾</span></h2>
+      <div class="pbody">
+        <p class="note" data-t="zonesNote"></p>
+        <table class="plist" id="tZones"></table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2><span data-t="pTunnel"></span><span class="chev">▾</span></h2>
+      <div class="pbody">
+        <p class="note" data-t="tunnelNote"></p>
+        <table class="plist" id="tTunnels"></table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2><span data-t="pExtra"></span><span class="chev">▾</span></h2>
+      <div class="pbody"><table class="plist" id="tExtras"></table></div>
+    </section>
+
+    <section class="panel edit">
+      <h2><span data-t="pFees"></span><span class="chev">▾</span></h2>
+      <div class="pbody">
+        <p class="note" data-t="feesNote"></p>
+        <div class="row"><label data-t="deepMinL"></label><input type="number" id="s_deepMin" value="8000" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <div class="row"><label data-t="deepStepL"></label><input type="number" id="s_deepStep" value="1000" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <p class="note" style="margin:4px 0 8px" data-t="deepNote"></p>
+        <div class="row"><label data-t="deepExtraMinL"></label><input type="number" id="s_deepExtraMin" value="120" class="flag"><span style="margin-left:2px" data-t="minShort"></span></div>
+        <div class="row"><label data-t="urgentL"></label><input type="number" id="s_urgent" value="300" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <div class="row"><label data-t="linenL"></label><input type="number" id="s_linen" value="50" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <p class="note" style="margin:10px 0 5px" data-t="petsExtrasNote"></p>
+        <div class="row"><label data-t="petsL"></label><input type="number" id="s_pets" value="225" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <div class="row"><label data-t="exOvenL"></label><input type="number" id="s_exOven" value="550" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <div class="row"><label data-t="exFridgeL"></label><input type="number" id="s_exFridge" value="425" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <div class="row"><label data-t="exFreezerL"></label><input type="number" id="s_exFreezer" value="425" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <div class="row"><label data-t="exWindowsL"></label><input type="number" id="s_exWindows" value="825" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <div class="row"><label data-t="exCabinetsL"></label><input type="number" id="s_exCabinets" value="650" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <div class="row"><label data-t="exDeepL"></label><input type="number" id="s_exDeep" value="1175" class="flag"><span style="margin-left:2px" data-t="krShort"></span></div>
+        <p class="note" style="margin:10px 0 5px" data-t="offHoursNote"></p>
+        <div class="row"><label data-t="offHoursL"></label><input type="number" id="s_offhours" value="15" class="flag"><span style="margin-left:2px">%</span></div>
+        <p class="note" style="margin:10px 0 5px" data-t="discNote"></p>
+        <div class="row"><label data-t="discWL"></label><input type="number" id="s_discW" value="15" class="flag"><span style="margin-left:2px">%</span></div>
+        <div class="row"><label data-t="discBL"></label><input type="number" id="s_discB" value="10" class="flag"><span style="margin-left:2px">%</span></div>
+        <div class="row"><label data-t="discML"></label><input type="number" id="s_discM" value="5" class="flag"><span style="margin-left:2px">%</span></div>
+      </div>
+    </section>
+
+    <section class="panel edit">
+      <h2><span data-t="pDrive"></span><span class="chev">▾</span></h2>
+      <div class="pbody">
+        <p class="note" id="driveNote"></p>
+        <div class="row"><label data-t="speedL"></label><input type="number" id="s_speed" value="75" min="10"></div>
+        <p class="note" style="margin:8px 0 5px" data-t="importL"></p>
+        <textarea id="importBox" placeholder="Miðvágur 37,2&#10;Klaksvík 41,0"></textarea>
+        <div class="btnrow">
+          <button class="sbtn" id="importBtn" data-t="importBtn"></button>
+          <button class="sbtn" id="resetKmBtn" data-t="resetKm"></button>
+        </div>
+        <div class="msg" id="importMsg"></div>
+      </div>
+    </section>
+
+    <section class="panel edit">
+      <h2><span data-t="pMargin"></span><span class="chev">▾</span></h2>
+      <div class="pbody">
+        <p class="note" data-t="marginNote"></p>
+        <div class="row"><label data-t="wageL"></label><input type="number" id="s_wage" value="220" class="flag"></div>
+        <div class="row"><label data-t="gmTargetL"></label><input type="number" id="s_gmt" value="50"></div>
+      </div>
+    </section>
+  </aside>
+
+  <main>
+    <section class="card">
+      <h2><span data-t="cardTitle"></span> <span class="s" data-t="cardSub"></span></h2>
+      <div class="inputs">
+        <div class="fld span2">
+          <label for="a_loc" data-t="fLocation"></label>
+          <select id="a_loc"></select>
+          <span class="u" id="locInfo">&nbsp;</span>
+        </div>
+        <div class="fld">
+          <label for="a_km" data-t="fKm"></label>
+          <input type="number" id="a_km" value="0" min="0" step="0.1">
+          <span class="u" id="kmSrc">&nbsp;</span>
+        </div>
+        <div class="fld">
+          <label for="a_size" data-t="fSize"></label>
+          <input type="number" id="a_size" value="95" min="0">
+          <span class="u" id="sizeInfo">&nbsp;</span>
+        </div>
+
+        <div class="fld" id="wrapBooking">
+          <label for="a_booking" data-t="fBooking"></label>
+          <select id="a_booking">
+            <option value="once" data-t="optOnce"></option>
+            <option value="recurring" data-t="optRecurring"></option>
+          </select>
+        </div>
+        <div class="fld tick" id="wrapDeep">
+          <input type="checkbox" id="a_deep"><label for="a_deep" data-t="fDeep"></label>
+        </div>
+        <div class="fld" id="wrapFreq">
+          <label for="a_freq" data-t="fFreq"></label>
+          <select id="a_freq">
+            <option value="weekly" data-t="optWeekly"></option>
+            <option value="biweekly" data-t="optBiweekly"></option>
+            <option value="monthly" data-t="optMonthly"></option>
+          </select>
+        </div>
+
+        <div class="fld">
+          <label for="a_weekday" data-t="fWeekday"></label>
+          <select id="a_weekday">
+            <option value="mon" data-t="dMon"></option>
+            <option value="tue" data-t="dTue"></option>
+            <option value="wed" data-t="dWed"></option>
+            <option value="thu" data-t="dThu"></option>
+            <option value="fri" data-t="dFri"></option>
+            <option value="sat" data-t="dSat"></option>
+            <option value="sun" data-t="dSun"></option>
+          </select>
+        </div>
+        <div class="fld">
+          <label for="a_time" data-t="fTime"></label>
+          <input type="time" id="a_time" value="09:00">
+        </div>
+        <div class="fld tick"><input type="checkbox" id="a_urgent"><label for="a_urgent" data-t="fUrgent"></label></div>
+
+        <div class="fld">
+          <label for="a_toilets" data-t="fToilets"></label>
+          <input type="number" id="a_toilets" value="1" min="1">
+          <span class="u" id="toiletInfo">&nbsp;</span>
+        </div>
+        <div class="fld">
+          <label for="a_persons" data-t="fPersons"></label>
+          <input type="number" id="a_persons" value="2" min="1">
+        </div>
+        <div class="fld tick"><input type="checkbox" id="a_linen"><label for="a_linen" data-t="fLinen"></label></div>
+        <div class="fld">
+          <label for="a_clean" data-t="fClean"></label>
+          <input type="number" id="a_clean" value="0" min="0">
+          <span class="u" id="cleanSrc">&nbsp;</span>
+        </div>
+      </div>
+
+      <div class="tilegroup">
+        <p class="tg-title" data-t="fPets"></p>
+        <div class="tiles" id="petsTiles">
+          <button type="button" class="tile" data-val="no">
+            <span class="tn" data-t="petsNo"></span><span class="tp" data-t="noChange"></span>
+          </button>
+          <button type="button" class="tile" data-val="yes">
+            <span class="tn" data-t="petsYes"></span><span class="tp" id="petsPriceLbl"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="tilegroup">
+        <p class="tg-title" data-t="fExtras"></p>
+        <div class="tiles" id="extrasTiles">
+          <button type="button" class="tile" data-key="oven">
+            <span class="tn" data-t="exOven"></span><span class="tp" id="exOvenPrice"></span>
+          </button>
+          <button type="button" class="tile" data-key="fridge">
+            <span class="tn" data-t="exFridge"></span><span class="tp" id="exFridgePrice"></span>
+          </button>
+          <button type="button" class="tile" data-key="freezer">
+            <span class="tn" data-t="exFreezer"></span><span class="tp" id="exFreezerPrice"></span>
+          </button>
+          <button type="button" class="tile" data-key="windows">
+            <span class="tn" data-t="exWindows"></span><span class="tp" id="exWindowsPrice"></span>
+          </button>
+          <button type="button" class="tile" data-key="cabinets">
+            <span class="tn" data-t="exCabinets"></span><span class="tp" id="exCabinetsPrice"></span>
+          </button>
+          <button type="button" class="tile" data-key="extradeep">
+            <span class="tn" data-t="exDeep"></span><span class="tp" id="exDeepPrice"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="flagbox" id="flag300"></div>
+
+      <div class="result">
+        <div class="bigbox">
+          <div class="lbl" id="bigLbl"></div>
+          <div class="amt" id="bigAmt"></div>
+          <div class="alt" id="bigAlt"></div>
+        </div>
+        <div class="kpis" id="kpis"></div>
+      </div>
+
+      <div class="incl" id="inclNote"></div>
+      <div class="bd" id="bd"></div>
+    </section>
+
+    <div class="foot">
+      <strong data-t="footTitle"></strong>
+      <ul>
+        <li id="foot1"></li>
+        <li data-t="foot3"></li>
+        <li data-t="foot4"></li>
+      </ul>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ==================== adgangslås ==================== */
+var PW_HASH = "76e829d2928c41954ecbc03af0000ee06386905ac942fd5f51c845b00ab439d2";
+
+function sha256(str){
+  function rr(n,x){ return (x>>>n)|(x<<(32-n)); }
+  var K=[],H=[],primes=[],i=2,j,s;
+  while(primes.length<64){
+    for(j=2;j*j<=i;j++) if(i%j===0) break;
+    if(j*j>i) primes.push(i);
+    i++;
+  }
+  for(i=0;i<64;i++) K[i]=(Math.pow(primes[i],1/3)%1*Math.pow(2,32))|0;
+  for(i=0;i<8;i++)  H[i]=(Math.pow(primes[i],1/2)%1*Math.pow(2,32))|0;
+
+  var bytes=[],k;
+  for(i=0;i<str.length;i++){
+    k=str.charCodeAt(i);
+    if(k<128) bytes.push(k);
+    else if(k<2048) bytes.push(192|(k>>6),128|(k&63));
+    else bytes.push(224|(k>>12),128|((k>>6)&63),128|(k&63));
+  }
+  var bitLen=bytes.length*8;
+  bytes.push(0x80);
+  while(bytes.length%64!==56) bytes.push(0);
+  for(i=7;i>=0;i--) bytes.push((i<4?Math.floor(bitLen/Math.pow(2,i*8)):0)&255);
+
+  var w=new Array(64),a,b,c,d,e,f,g,h,t1,t2,S0,S1,ch,maj,blk;
+  for(blk=0;blk<bytes.length;blk+=64){
+    for(i=0;i<16;i++)
+      w[i]=(bytes[blk+i*4]<<24)|(bytes[blk+i*4+1]<<16)|(bytes[blk+i*4+2]<<8)|bytes[blk+i*4+3];
+    for(i=16;i<64;i++){
+      s=w[i-15]; S0=rr(7,s)^rr(18,s)^(s>>>3);
+      s=w[i-2];  S1=rr(17,s)^rr(19,s)^(s>>>10);
+      w[i]=(w[i-16]+S0+w[i-7]+S1)|0;
+    }
+    a=H[0];b=H[1];c=H[2];d=H[3];e=H[4];f=H[5];g=H[6];h=H[7];
+    for(i=0;i<64;i++){
+      S1=rr(6,e)^rr(11,e)^rr(25,e);
+      ch=(e&f)^(~e&g);
+      t1=(h+S1+ch+K[i]+w[i])|0;
+      S0=rr(2,a)^rr(13,a)^rr(22,a);
+      maj=(a&b)^(a&c)^(b&c);
+      t2=(S0+maj)|0;
+      h=g;g=f;f=e;e=(d+t1)|0;d=c;c=b;b=a;a=(t1+t2)|0;
+    }
+    H[0]=(H[0]+a)|0;H[1]=(H[1]+b)|0;H[2]=(H[2]+c)|0;H[3]=(H[3]+d)|0;
+    H[4]=(H[4]+e)|0;H[5]=(H[5]+f)|0;H[6]=(H[6]+g)|0;H[7]=(H[7]+h)|0;
+  }
+  var out="";
+  for(i=0;i<8;i++) out+=("00000000"+(H[i]>>>0).toString(16)).slice(-8);
+  return out;
+}
+
+(function(){
+  var gate=document.getElementById("gate"),
+      pw=document.getElementById("gatePw"),
+      btn=document.getElementById("gateBtn"),
+      err=document.getElementById("gateErr"),
+      box=gate.querySelector(".gatebox");
+
+  function unlock(){
+    if(sha256(pw.value.trim().toLowerCase()) === PW_HASH){
+      gate.classList.add("off");
+      document.body.classList.remove("locked");
+      var first=document.getElementById("a_loc");
+      if(first) first.focus();
+    } else {
+      err.textContent="Forkert adgangskode";
+      box.classList.remove("shake");
+      void box.offsetWidth;
+      box.classList.add("shake");
+      pw.select();
+    }
+  }
+  btn.addEventListener("click", unlock);
+  pw.addEventListener("keydown", function(ev){ if(ev.key==="Enter") unlock(); });
+  pw.addEventListener("input", function(){ err.textContent=""; });
+  pw.focus();
+})();
+</script>
+
+<script>
+"use strict";
+
+/* ==================== FASTE PRISER ==================== */
+const BASE = [
+  {max:70,  price:850,  clean:75},
+  {max:120, price:1300, clean:105},
+  {max:150, price:1550, clean:135},
+  {max:300, price:2500, clean:165},
+  {max:Infinity, price:3500, clean:210, individual:true}
+];
+const ZONES = [
+  {maxRT:20,       fee:0,   key:"zFree"},
+  {maxRT:40,       fee:200, key:"zone1"},
+  {maxRT:60,       fee:400, key:"zone2"},
+  {maxRT:Infinity, fee:600, key:"zone3"}
+];
+const TUNNELS = {
+  none:     {key:"tunNone",                        fee:0},
+  vagar:    {name:"Vágatunnilin",                  fee:20},
+  eysturoy: {name:"Eysturoyartunnilin",            fee:150},
+  klaksvik: {name:"Eysturoyar- + Norðoyatunnilin", fee:170},
+  sandoy:   {name:"Sandoyartunnilin",              fee:150}
+};
+const TOILET_EXTRA = 150;
+const TOILET_MIN   = 15;
+
+/* ==================== AFSTANDE ==================== */
+const PLACES = [
+["Streymoy",[
+ ["Tórshavn",0,"none"],["Argir",3,"none"],["Hoyvík",3,"none"],["Hvítanes",8,"none"],
+ ["Velbastaður",10,"none"],["Kaldbak",12,"none"],["Norðradalur",12,"none"],["Kirkjubøur",13,"none"],
+ ["Kollafjørður",17,"none"],["Leynar",22,"none"],["Hósvík",24,"none"],["Kvívík",26,"none"],
+ ["Nesvík",27,"none"],["Stykkið",29,"none"],["Hvalvík",30,"none"],["Við Áir",31,"none"],
+ ["Streymnes",33,"none"],["Vestmanna",37,"none"],["Haldórsvík",38,"none"],
+ ["Tjørnuvík",47,"none"],["Saksun",47,"none"]
+]],
+["Eysturoy",[
+ ["Strendur",17,"eysturoy"],["Runavík",17,"eysturoy"],["Saltangará",19,"eysturoy"],
+ ["Glyvrar",21,"eysturoy"],["Toftir",22,"eysturoy"],["Innan Glyvur",22,"eysturoy"],
+ ["Søldarfjørður",24,"eysturoy"],["Skála",25,"eysturoy"],["Rituvík",25,"eysturoy"],
+ ["Oyrarbakki",27,"none"],["Norðskáli",28,"none"],["Oyri",28,"none"],["Æðuvík",28,"eysturoy"],
+ ["Norðragøta",30,"eysturoy"],["Syðrugøta",31,"eysturoy"],["Gøtugjógv",32,"eysturoy"],
+ ["Leirvík",34,"eysturoy"],["Fuglafjørður",37,"eysturoy"],["Eiði",41,"none"],
+ ["Oyndarfjørður",42,"eysturoy"],["Funningur",45,"eysturoy"],["Elduvík",48,"eysturoy"],
+ ["Gjógv",53,"eysturoy"]
+]],
+["Norðoyggjar",[
+ ["Klaksvík",40,"klaksvik"],["Norðoyri",44,"klaksvik"],["Árnafjørður",45,"klaksvik"],
+ ["Haraldssund",52,"klaksvik"],["Norðdepil",55,"klaksvik"],["Hvannasund",56,"klaksvik"],
+ ["Viðareiði",65,"klaksvik"]
+]],
+["Vágar",[
+ ["Sandavágur",33,"vagar"],["Miðvágur",37,"vagar"],["Vatnsoyrar",40,"vagar"],
+ ["Flogvøllur",45,"vagar"],["Sørvágur",46,"vagar"],["Bøur",51,"vagar"],["Gásadalur",57,"vagar"]
+]],
+["Sandoy",[
+ ["Skopun",25,"sandoy"],["Sandur",33,"sandoy"],["Skarvanes",38,"sandoy"],
+ ["Skálavík",43,"sandoy"],["Húsavík",45,"sandoy"],["Dalur",50,"sandoy"]
+]]
+];
+const PLACE = {};
+PLACES.forEach(g => g[1].forEach(p => PLACE[p[0]] = {km:p[1], tunnel:p[2]}));
+
+/* ==================== SPROG ==================== */
+const L = {
+da:{
+ appTitle:"Prisberegner for privatkunder",
+ vatOff:"Alle beløb i DKK ekskl. moms", vatOn:"Alle beløb i DKK inkl. 25 % moms",
+ showIncl:"Vis inkl. moms", showExcl:"Vis ekskl. moms",
+ copy:"Kopier beregning", copied:"Beregningen er kopieret", copyFail:"Kunne ikke kopiere",
+ save:"Gem", load:"Indlæs", print:"Print", loadErr:"Filen kunne ikke læses.",
+
+ lockNote:"Grundprislisten, zoner og tunneltillæg er faste og genbrugt fra rengørings-prislisten. Tillæg, rabatter, køretider og margin kan justeres nedenfor.",
+ pBase:"Grundpris efter størrelse",
+ upTo:"Til og med {x} m²", range:"{a}–{b} m²", above:"Over {x} m²", individual:"individuelt tilbud",
+ pZones:"Kørsel · zoner",
+ zonesNote:"Zonen sættes efter kørselstiden tur-retur. Den følger af afstanden i km, som tælles begge veje.",
+ zFree:"Fri zone", zone1:"Zone 1", zone2:"Zone 2", zone3:"Zone 3",
+ minUpTo:"til og med {x} min", minRange:"{a}–{b} min", minOver:"over {x} min",
+ pTunnel:"Tunnel", tunnelNote:"Tur-retur. Følger automatisk af beliggenheden.", tunNone:"Ingen tunnel",
+ pExtra:"Toiletter",
+ toiletL:"Pr. toilet ud over det første",
+
+ pFees:"Tillæg og rabat",
+ feesNote:"Placeholder-satser — skal godkendes, før værktøjet bruges til rigtige tilbud.",
+ deepMinL:"Hovedrengøring, minimumspris (under 70 m²)",
+ deepStepL:"Hovedrengøring, tillæg pr. 10 m² derover",
+ deepNote:"Under 70 m² koster hovedrengøring minimumsprisen. Derover lægges tillægget oveni for hver påbegyndt 10 m² over 70.",
+ deepExtraMinL:"Ekstra vasketid ved hovedrengøring, minutter",
+ minShort:"min",
+ urgentL:"Akut-tillæg (kort varsel)",
+ linenL:"Sengetøj (vask/opredning), pr. person",
+ krShort:"kr.",
+ petsExtrasNote:"Kæledyr og ekstra opgaver, faste tillæg.",
+ petsL:"Kæledyr, tillæg", exOvenL:"Ovn", exFridgeL:"Køleskab", exFreezerL:"Fryser",
+ exWindowsL:"Vinduer", exCabinetsL:"Indvendige skabe", exDeepL:"Ekstra grundig rengøring",
+ offHoursNote:"Efter kl. 16 og i weekenden lægges et tillæg på hele beløbet, ud fra ugedag og klokkeslæt.",
+ offHoursL:"Tillæg, efter kl. 16 / i weekenden",
+ bdOffHours:"Uden for normal arbejdstid",
+ discNote:"Rabat på faste aftaler, i % af totalen inkl. tillæg.",
+ discWL:"Rabat, ugentligt", discBL:"Rabat, hver anden uge", discML:"Rabat, månedligt",
+
+ pDrive:"Køretider",
+ driveNote:"Indtast km én vej, som Landsverk opgiver dem. Beregneren fordobler dem og regner tur-retur-tiden som km ÷ gennemsnitsfart.",
+ speedL:"Gennemsnitsfart, km/t",
+ importL:"Indsæt km fra Landsverk. Én linje pr. sted:",
+ importBtn:"Indlæs km", resetKm:"Nulstil",
+ importOk:"{n} steder opdateret.", importNone:"Ingen linjer kunne læses.",
+ importUnknown:"{n} navne blev ikke genkendt.", resetOk:"Alle km sat tilbage.",
+
+ pMargin:"Bruttomargin", marginNote:"Ændrer ikke prisen, kun marginen.",
+ wageL:"Lønomkostning, kr./t", gmTargetL:"Mål, bruttomargin %",
+
+ cardTitle:"Kunden", cardSub:"Vælg beliggenhed, størrelse og hvad opgaven omfatter",
+ fLocation:"Beliggenhed", fKm:"Afstand fra Tórshavn, km én vej", fSize:"Størrelse, m²",
+ fBooking:"Engangs eller fast aftale", optOnce:"Engangsvask", optRecurring:"Fast aftale",
+ fDeep:"Hovedrengøring",
+ fFreq:"Hyppighed", optWeekly:"Ugentligt", optBiweekly:"Hver anden uge", optMonthly:"Månedligt",
+ fWeekday:"Ugedag",
+ dMon:"Mandag", dTue:"Tirsdag", dWed:"Onsdag", dThu:"Torsdag", dFri:"Fredag", dSat:"Lørdag", dSun:"Søndag",
+ fTime:"Klokkeslæt",
+ fUrgent:"Akut bestilling (kort varsel)",
+ fToilets:"Antal toiletter", fPersons:"Antal personer", fLinen:"Vask og opredning af sengetøj",
+ fPets:"Har du kæledyr?", petsNo:"Nej", petsYes:"Ja", noChange:"Ingen ændring",
+ fExtras:"Ekstra opgaver", exOven:"Ovn", exFridge:"Køleskab", exFreezer:"Fryser",
+ exWindows:"Vinduer", exCabinets:"Indvendige skabe", exDeep:"Ekstra grundig rengøring",
+ bdPets:"Kæledyr",
+ fClean:"Vasketid 1 person, minutter",
+ locInfo:"{kmr} km tur-retur · {r} min tur-retur · {z} · {t}",
+ kmAuto:"Vores tal. Ret det, hvis Landsverk siger noget andet.",
+ kmManual:"Rettet manuelt. Huskes for dette sted.",
+ cleanAuto:"Foreslået ud fra størrelse, toiletter og hovedrengøring. Påvirker kun marginen.",
+ cleanManual:"Rettet manuelt. Påvirker kun marginen.",
+ toiletNone:"Ét toilet, ingen tillæg.", toiletExtra:"{n} ekstra · {kr} kr.",
+ flag300:"Over 300 m² er prisen et individuelt tilbud. Tallet herunder er kun et udgangspunkt.",
+
+ priceExcl:"Pris ekskl. moms", priceIncl:"Pris inkl. 25 % moms",
+ altExcl:"{x} kr. ekskl. moms", altIncl:"{x} kr. inkl. moms", kr:"kr.",
+ kpiZone:"Zone", kpiTunnel:"Tunnel", kpiGm:"Bruttomargin", uHours:"t",
+ kpiSchedule:"Aftale",
+ schedOnce:"Engangs", schedRecurring:"{f} · {d} · {t}",
+ inclNote:"Prisen dækker rengøring af hele boligen som angivet. Der beregnes ikke tillæg pr. person, medmindre sengetøj er valgt.",
+
+ bdBuild:"Prisen bygges sådan op",
+ bdBase:"Grundpris", bdTravel:"Kørsel", roundTrip:"km tur-retur / {m} min", bdTunnel:"Tunnel",
+ bdToilets:"{n} ekstra toilet",
+ bdDeep:"Hovedrengøring", bdUrgent:"Akut-tillæg", bdLinen:"Sengetøj, {n} personer", bdDisc:"Rabat, fast aftale",
+ totalExcl:"I alt ekskl. moms", totalIncl:"I alt inkl. moms",
+
+ bdMargin:"Bruttomargin",
+ bdWageLine:"Løn, {h} timer à {x} kr.", bdTunCost:"Tunnel, faktisk udgift",
+ bdCost:"Omkostning i alt", bdGross:"Bruttomargin",
+ mmClean:"Vask, {x} min", mmDrive:"Kørsel, {x} min",
+ legCost:"Omkostning", legGm:"Margin",
+
+ footTitle:"Værd at vide",
+ foot1:'Afstandene er km ad vej fra Tórshavn med de nuværende tunneller. Slå jeres egne op i <a href="https://lv.fo/vegateinur/indexTwo.php" target="_blank" rel="noopener">Landsverks vegaroknari</a> og indsæt dem i venstre spalte. Indtast dem én vej — beregneren fordobler selv.',
+ foot3:"Hovedrengøring vælges kun ved engangsvask. Ved faste aftaler forudsættes almindelig heima vask hver gang.",
+ foot4:"Lønsatsen og alle tillægsprocenter/-beløb i venstre spalte er placeholdere og skal godkendes.",
+
+ cTitle:"Rengøringspris — Klárt", cSpec:"{loc} · {s} m² · {km} km tur-retur / {o} min",
+ cToilets:"{n} toiletter", cMargin:"Bruttomargin: {x} kr. ({p} %)"
+},
+en:{
+ appTitle:"Price calculator for private customers",
+ vatOff:"All amounts in DKK excl. VAT", vatOn:"All amounts in DKK incl. 25% VAT",
+ showIncl:"Show incl. VAT", showExcl:"Show excl. VAT",
+ copy:"Copy calculation", copied:"Calculation copied", copyFail:"Could not copy",
+ save:"Save", load:"Load", print:"Print", loadErr:"The file could not be read.",
+
+ lockNote:"The base price list, zones, and tunnel fees are fixed, reused from the cleaning price list. Fees, discounts, driving times, and margin can be adjusted below.",
+ pBase:"Base price by size",
+ upTo:"Up to {x} m²", range:"{a}–{b} m²", above:"Above {x} m²", individual:"individual quote",
+ pZones:"Travel · zones",
+ zonesNote:"The zone follows round-trip driving time. It comes from the distance in km, counted both ways.",
+ zFree:"Free zone", zone1:"Zone 1", zone2:"Zone 2", zone3:"Zone 3",
+ minUpTo:"up to {x} min", minRange:"{a}–{b} min", minOver:"above {x} min",
+ pTunnel:"Tunnel", tunnelNote:"Round trip. Set automatically by the location.", tunNone:"No tunnel",
+ pExtra:"Toilets",
+ toiletL:"Per toilet beyond the first",
+
+ pFees:"Fees and discounts",
+ feesNote:"Placeholder rates — must be approved before the tool is used for real quotes.",
+ deepMinL:"Deep cleaning, minimum price (under 70 m²)",
+ deepStepL:"Deep cleaning, fee per 10 m² above that",
+ deepNote:"Under 70 m² deep cleaning costs the minimum price. Above that, the fee is added for every 10 m² started above 70.",
+ deepExtraMinL:"Extra cleaning time for deep cleaning, minutes",
+ minShort:"min",
+ urgentL:"Urgent fee (short notice)",
+ linenL:"Bed linen (wash/making), per person",
+ krShort:"DKK",
+ petsExtrasNote:"Pets and extra tasks, fixed fees.",
+ petsL:"Pets, fee", exOvenL:"Oven", exFridgeL:"Fridge", exFreezerL:"Freezer",
+ exWindowsL:"Windows", exCabinetsL:"Inside cabinets", exDeepL:"Extra deep cleaning",
+ offHoursNote:"After 16:00 and on weekends, a surcharge is added to the whole amount, based on weekday and time.",
+ offHoursL:"Surcharge, after 16:00 / weekends",
+ bdOffHours:"Outside normal working hours",
+ discNote:"Discount on recurring bookings, as % of the total incl. fees.",
+ discWL:"Discount, weekly", discBL:"Discount, every other week", discML:"Discount, monthly",
+
+ pDrive:"Driving times",
+ driveNote:"Enter km one way, as Landsverk gives them. The calculator doubles them and works out round-trip time as km ÷ average speed.",
+ speedL:"Average speed, km/h",
+ importL:"Paste km from Landsverk. One line per place:",
+ importBtn:"Load km", resetKm:"Reset",
+ importOk:"{n} places updated.", importNone:"No lines could be read.",
+ importUnknown:"{n} names were not recognised.", resetOk:"All distances reset.",
+
+ pMargin:"Gross margin", marginNote:"Does not change the price, only the margin.",
+ wageL:"Wage cost, DKK/h", gmTargetL:"Target gross margin %",
+
+ cardTitle:"The customer", cardSub:"Choose location, size, and what the job covers",
+ fLocation:"Location", fKm:"Distance from Tórshavn, km one way", fSize:"Size, m²",
+ fBooking:"One-off or recurring", optOnce:"One-off clean", optRecurring:"Recurring booking",
+ fDeep:"Deep cleaning",
+ fFreq:"Frequency", optWeekly:"Weekly", optBiweekly:"Every other week", optMonthly:"Monthly",
+ fWeekday:"Day of week",
+ dMon:"Monday", dTue:"Tuesday", dWed:"Wednesday", dThu:"Thursday", dFri:"Friday", dSat:"Saturday", dSun:"Sunday",
+ fTime:"Time",
+ fUrgent:"Urgent booking (short notice)",
+ fToilets:"Number of toilets", fPersons:"Number of people", fLinen:"Wash and make up bed linen",
+ fPets:"Do you have pets?", petsNo:"No", petsYes:"Yes", noChange:"No change",
+ fExtras:"Extra tasks", exOven:"Oven", exFridge:"Fridge", exFreezer:"Freezer",
+ exWindows:"Windows", exCabinets:"Inside cabinets", exDeep:"Extra deep cleaning",
+ bdPets:"Pets",
+ fClean:"Cleaning time one person, minutes",
+ locInfo:"{kmr} km round trip · {r} min round trip · {z} · {t}",
+ kmAuto:"Our figure. Correct it if Landsverk says otherwise.",
+ kmManual:"Set manually. Remembered for this place.",
+ cleanAuto:"Suggested from size, toilets, and deep cleaning. Affects the margin only.",
+ cleanManual:"Set manually. Affects the margin only.",
+ toiletNone:"One toilet, no supplement.", toiletExtra:"{n} extra · DKK {kr}",
+ flag300:"Above 300 m² the price is an individual quote. The figure below is only a starting point.",
+
+ priceExcl:"Price excl. VAT", priceIncl:"Price incl. 25% VAT",
+ altExcl:"DKK {x} excl. VAT", altIncl:"DKK {x} incl. VAT", kr:"DKK",
+ kpiZone:"Zone", kpiTunnel:"Tunnel", kpiGm:"Gross margin", uHours:"h",
+ kpiSchedule:"Booking",
+ schedOnce:"One-off", schedRecurring:"{f} · {d} · {t}",
+ inclNote:"The price covers cleaning of the whole home as specified. There is no per-person supplement unless bed linen is selected.",
+
+ bdBuild:"How the price is built",
+ bdBase:"Base price", bdTravel:"Travel", roundTrip:"km round trip / {m} min", bdTunnel:"Tunnel",
+ bdToilets:"{n} extra toilet",
+ bdDeep:"Deep cleaning", bdUrgent:"Urgent fee", bdLinen:"Bed linen, {n} people", bdDisc:"Recurring discount",
+ totalExcl:"Total excl. VAT", totalIncl:"Total incl. VAT",
+
+ bdMargin:"Gross margin",
+ bdWageLine:"Wages, {h} hours at {x} DKK", bdTunCost:"Tunnel, actual cost",
+ bdCost:"Total cost", bdGross:"Gross margin",
+ mmClean:"Cleaning, {x} min", mmDrive:"Driving, {x} min",
+ legCost:"Cost", legGm:"Margin",
+
+ footTitle:"Worth knowing",
+ foot1:'Distances are road kilometres from Tórshavn using the current tunnels. Look your own up in <a href="https://lv.fo/vegateinur/indexTwo.php" target="_blank" rel="noopener">Landsverk\'s road calculator</a> and paste them into the left-hand panel. Enter them one way — the calculator doubles them itself.',
+ foot3:"Deep cleaning is only offered on one-off cleans. Recurring bookings assume regular heima vask every time.",
+ foot4:"The wage rate and all fee percentages/amounts in the left panel are placeholders and must be approved.",
+
+ cTitle:"Cleaning price — Klárt", cSpec:"{loc} · {s} m² · {km} km round trip / {o} min",
+ cToilets:"{n} toilets", cMargin:"Gross margin: DKK {x} ({p}%)"
+},
+fo:{
+ appTitle:"Prísroknari fyri privatkundar",
+ vatOff:"Allar upphæddir í DKK uttan MVG", vatOn:"Allar upphæddir í DKK við 25 % MVG",
+ showIncl:"Vís við MVG", showExcl:"Vís uttan MVG",
+ copy:"Avrita útrokning", copied:"Útrokningin er avritað", copyFail:"Kundi ikki avrita",
+ save:"Goym", load:"Les inn", print:"Prenta", loadErr:"Fílan kundi ikki lesast.",
+
+ lockNote:"Grundprísskráin, øki og tunniltillegg eru føst, tikin úr reingerðar-prísskránni. Tillegg, avslátt, koyritíðir og margin kunnu broytast niðanfyri.",
+ pBase:"Grundprísur eftir stødd",
+ upTo:"Til og við {x} m²", range:"{a}–{b} m²", above:"Yvir {x} m²", individual:"einstakt tilboð",
+ pZones:"Koyring · øki",
+ zonesNote:"Økið fylgir koyritíðini fram og aftur. Hon kemur av vegalongdini í km, sum verður talt báðar vegir.",
+ zFree:"Frítt øki", zone1:"Øki 1", zone2:"Øki 2", zone3:"Øki 3",
+ minUpTo:"til og við {x} min", minRange:"{a}–{b} min", minOver:"yvir {x} min",
+ pTunnel:"Tunnil", tunnelNote:"Fram og aftur. Verður settur sjálvvirkandi eftir staðsetingini.", tunNone:"Eingin tunnil",
+ pExtra:"Vesi",
+ toiletL:"Fyri hvørt vesi umframt tað fyrsta",
+
+ pFees:"Tillegg og avsláttur",
+ feesNote:"Placeholder-satsir — skulu góðkennast, áðrenn amboðið verður brúkt til veruleg tilboð.",
+ deepMinL:"Høvuðsreingerð, minimumsprísur (undir 70 m²)",
+ deepStepL:"Høvuðsreingerð, tillegg fyri hvørjar 10 m² omframt",
+ deepNote:"Undir 70 m² kostar høvuðsreingerð minimumsprísin. Omframt tað verður tillegg lagt afturat fyri hvørjar byrjaðar 10 m² yvir 70.",
+ deepExtraMinL:"Eyka vasktíð við høvuðsreingerð, minuttir",
+ minShort:"min",
+ urgentL:"Skjót-tillegg (stutt fyrivarsl)",
+ linenL:"Rúmfatnaður (vask/reiðing), pr. persón",
+ krShort:"kr.",
+ petsExtrasNote:"Djór og eyka uppgávur, føst tillegg.",
+ petsL:"Djór, tillegg", exOvenL:"Ovnur", exFridgeL:"Kælskápur", exFreezerL:"Frystari",
+ exWindowsL:"Vindeygu", exCabinetsL:"Skápar innaneftir", exDeepL:"Eyka grundig reingerð",
+ offHoursNote:"Eftir kl. 16 og um vikuskiftini verður eitt tillegg lagt á alla upphæddina, útfrá vikudegi og klokkuslagi.",
+ offHoursL:"Tillegg, eftir kl. 16 / vikuskiftini",
+ bdOffHours:"Uttan fyri vanliga arbeiðstíð",
+ discNote:"Avsláttur á føstum avtalum, í % av heildini við tillegg.",
+ discWL:"Avsláttur, hvørja viku", discBL:"Avsláttur, aðra hvørja viku", discML:"Avsláttur, mánaðarliga",
+
+ pDrive:"Koyritíðir",
+ driveNote:"Skriva km ein veg, sum Landsverk gevur tær upp. Roknarin tvífaldar tær og roknar tíðina fram og aftur sum km ÷ miðalferð.",
+ speedL:"Miðalferð, km/t",
+ importL:"Set km inn frá Landsverki. Ein linja fyri hvørt stað:",
+ importBtn:"Les inn km", resetKm:"Nullstilla",
+ importOk:"{n} støð dagførd.", importNone:"Ongar linjur kundu lesast.",
+ importUnknown:"{n} nøvn vórðu ikki kend.", resetOk:"Allar vegalongdir settar aftur.",
+
+ pMargin:"Bruttomargin", marginNote:"Broytir ikki prísin, bert marginin.",
+ wageL:"Lønarkostnaður, kr./t", gmTargetL:"Mál, bruttomargin %",
+
+ cardTitle:"Kundin", cardSub:"Vel staðseting, stødd og hvat uppgávan fevnir um",
+ fLocation:"Staðseting", fKm:"Vegalongd frá Tórshavn, km ein veg", fSize:"Stødd, m²",
+ fBooking:"Eingangsvask ella føst avtala", optOnce:"Eingangsvask", optRecurring:"Føst avtala",
+ fDeep:"Høvuðsreingerð",
+ fFreq:"Hvussu ofta", optWeekly:"Hvørja viku", optBiweekly:"Aðra hvørja viku", optMonthly:"Mánaðarliga",
+ fWeekday:"Vikudagur",
+ dMon:"Mánadagur", dTue:"Týsdagur", dWed:"Mikudagur", dThu:"Hósdagur", dFri:"Fríggjadagur", dSat:"Leygardagur", dSun:"Sunnudagur",
+ fTime:"Klokkuslag",
+ fUrgent:"Skjót bíleiging (stutt fyrivarsl)",
+ fToilets:"Tal av vesum", fPersons:"Tal av persónum", fLinen:"Vask og reiðing av rúmfatnaði",
+ fPets:"Hevur tú djór?", petsNo:"Nei", petsYes:"Ja", noChange:"Eingin broyting",
+ fExtras:"Eyka uppgávur", exOven:"Ovnur", exFridge:"Kælskápur", exFreezer:"Frystari",
+ exWindows:"Vindeygu", exCabinets:"Skápar innaneftir", exDeep:"Eyka grundig reingerð",
+ bdPets:"Djór",
+ fClean:"Vasktíð 1 persónur, minuttir",
+ locInfo:"{kmr} km fram og aftur · {r} min fram og aftur · {z} · {t}",
+ kmAuto:"Okkara tal. Rætta tað, um Landsverk sigur annað.",
+ kmManual:"Rættað við hond. Verður minst fyri hetta staðið.",
+ cleanAuto:"Uppskotið eftir stødd, vesum og høvuðsreingerð. Ávirkar bert marginin.",
+ cleanManual:"Rættað við hond. Ávirkar bert marginin.",
+ toiletNone:"Eitt vesi, einki íkast.", toiletExtra:"{n} eyka · {kr} kr.",
+ flag300:"Yvir 300 m² er prísurin eitt einstakt tilboð. Talið niðanfyri er bert eitt útgangsstøði.",
+
+ priceExcl:"Prísur uttan MVG", priceIncl:"Prísur við 25 % MVG",
+ altExcl:"{x} kr. uttan MVG", altIncl:"{x} kr. við MVG", kr:"kr.",
+ kpiZone:"Øki", kpiTunnel:"Tunnil", kpiGm:"Bruttomargin", uHours:"t",
+ kpiSchedule:"Avtala",
+ schedOnce:"Eingangsvask", schedRecurring:"{f} · {d} · {t}",
+ inclNote:"Prísurin fevnir um reingerð av øllum húsinum sum uppgivið. Einki íkast fyri hvønn persón, uttan tá rúmfatnaður er valt.",
+
+ bdBuild:"Soleiðis verður prísurin bygdur upp",
+ bdBase:"Grundprísur", bdTravel:"Koyring", roundTrip:"km fram og aftur / {m} min", bdTunnel:"Tunnil",
+ bdToilets:"{n} eyka vesi",
+ bdDeep:"Høvuðsreingerð", bdUrgent:"Skjót-tillegg", bdLinen:"Rúmfatnaður, {n} persónar", bdDisc:"Avsláttur, føst avtala",
+ totalExcl:"Tilsamans uttan MVG", totalIncl:"Tilsamans við MVG",
+
+ bdMargin:"Bruttomargin",
+ bdWageLine:"Løn, {h} tímar à {x} kr.", bdTunCost:"Tunnil, veruligur kostnaður",
+ bdCost:"Kostnaður tilsamans", bdGross:"Bruttomargin",
+ mmClean:"Vask, {x} min", mmDrive:"Koyring, {x} min",
+ legCost:"Kostnaður", legGm:"Margin",
+
+ footTitle:"Vert at vita",
+ foot1:'Vegalongdirnar eru km eftir vegnum frá Tórshavn við teimum tunlunum, sum eru í dag. Flet tykkara egnu upp í <a href="https://lv.fo/vegateinur/indexTwo.php" target="_blank" rel="noopener">vegaroknaranum hjá Landsverki</a> og set tær inn í vinstru spaltuni. Skriva tær ein veg — roknarin tvífaldar sjálvur.',
+ foot3:"Høvuðsreingerð er bert í boði við einstakari ferð. Við føstum avtalum verður hildið, at tað er vanlig heima vask hvørja ferð.",
+ foot4:"Lønarupphæddin og øll tillegs-prosent/-upphæddir í vinstru spaltuni eru placeholderar og skulu góðkennast.",
+
+ cTitle:"Reingerðarprísur — Klárt", cSpec:"{loc} · {s} m² · {km} km fram og aftur / {o} min",
+ cToilets:"{n} vesi", cMargin:"Bruttomargin: {x} kr. ({p} %)"
+}
+};
+
+let lang = "da";
+const t = k => (L[lang] && L[lang][k] !== undefined) ? L[lang][k] : (L.da[k] !== undefined ? L.da[k] : k);
+const f = (k,o) => { let s = t(k); for(const p in o) s = s.split("{"+p+"}").join(o[p]); return s; };
+const locale = () => lang === "en" ? "en-GB" : "da-DK";
+
+const $ = id => document.getElementById(id);
+const num = id => { const v = parseFloat($(id).value); return isNaN(v) ? 0 : v; };
+const kr  = n => Math.round(n).toLocaleString(locale());
+const kr1 = n => (Math.round(n*10)/10).toLocaleString(locale(),{minimumFractionDigits:1,maximumFractionDigits:1});
+
+let state = { vat:false, manualClean:false };
+let petsYes = false;
+const extrasSel = new Set();
+const EXTRAS = [
+  {key:"oven",      setting:"s_exOven",     labelKey:"exOven",     btn:"exOvenPrice"},
+  {key:"fridge",    setting:"s_exFridge",   labelKey:"exFridge",   btn:"exFridgePrice"},
+  {key:"freezer",   setting:"s_exFreezer",  labelKey:"exFreezer",  btn:"exFreezerPrice"},
+  {key:"windows",   setting:"s_exWindows",  labelKey:"exWindows",  btn:"exWindowsPrice"},
+  {key:"cabinets",  setting:"s_exCabinets", labelKey:"exCabinets", btn:"exCabinetsPrice"},
+  {key:"extradeep", setting:"s_exDeep",     labelKey:"exDeep",     btn:"exDeepPrice"}
+];
+const tunName = k => { const x = TUNNELS[k] || TUNNELS.none; return x.name || t(x.key); };
+
+const KM_OVERRIDE = {};
+const kmOf   = loc => KM_OVERRIDE[loc] !== undefined ? KM_OVERRIDE[loc] : (PLACE[loc] ? PLACE[loc].km : 0);
+const minsOf = km  => { const s = num("s_speed") || 1; return Math.round(km / s * 60); };
+
+function baseIndex(size){ const i = BASE.findIndex(b => size <= b.max); return i < 0 ? BASE.length-1 : i; }
+
+/* hovedrengøring: minimumspris under 70 m², så tillæg pr. påbegyndt 10 m² derover */
+function deepCleanFee(size){
+  const min = num("s_deepMin"), step = num("s_deepStep");
+  if(size <= 70) return min;
+  return min + Math.ceil((size - 70) / 10) * step;
+}
+
+/* foreslået vasketid: hovedrengøring lægger et fast antal minutter oveni */
+const autoClean = (size,toilets,booking,deep) => {
+  let mins = BASE[baseIndex(size)].clean + TOILET_MIN * Math.max(0, toilets - 1);
+  if(booking === "once" && deep) mins += num("s_deepExtraMin");
+  return mins;
+};
+
+/* ==================== BEREGNINGEN ==================== */
+function calc(){
+  const loc     = $("a_loc").value;
+  const place   = PLACE[loc] || {km:0, tunnel:"none"};
+  const size    = num("a_size");
+  const km      = num("a_km");
+  const kmRT    = km * 2;
+  const roundT  = minsOf(kmRT);
+  const toilets = Math.max(1, Math.round(num("a_toilets")) || 1);
+  const persons = Math.max(1, Math.round(num("a_persons")) || 1);
+
+  const booking  = $("a_booking").value;                // once | recurring
+  const deep     = $("a_deep").checked;
+  const freq     = $("a_freq").value;                   // weekly | biweekly | monthly
+  const weekday  = $("a_weekday").value;
+  const time     = $("a_time").value;
+  const urgent   = $("a_urgent").checked;
+  const linen    = $("a_linen").checked;
+
+  const bi = baseIndex(size);
+  const base = BASE[bi].price;
+  const individual = !!BASE[bi].individual;
+  const baseLbl = bi === 0 ? f("upTo",{x:kr(BASE[0].max)})
+                : individual ? f("above",{x:kr(BASE[BASE.length-2].max)})
+                : f("range",{a:kr(BASE[bi-1].max+1), b:kr(BASE[bi].max)});
+
+  let zi = ZONES.findIndex(z => roundT <= z.maxRT);
+  if(zi < 0) zi = ZONES.length - 1;
+  const zoneFee = ZONES[zi].fee, zoneName = t(ZONES[zi].key);
+
+  const tunKey = place.tunnel;
+  const tunFee = TUNNELS[tunKey] ? TUNNELS[tunKey].fee : 0;
+
+  const extraToi  = toilets - 1;
+  const toiletFee = extraToi * TOILET_EXTRA;
+
+  const deepFee   = (booking === "once" && deep) ? deepCleanFee(size) : 0;
+  const urgentFee = urgent ? num("s_urgent") : 0;
+  const linenFee  = linen ? persons * num("s_linen") : 0;
+  const petsFee   = petsYes ? num("s_pets") : 0;
+  const extrasList = EXTRAS.filter(x => extrasSel.has(x.key));
+  const extrasFee = extrasList.reduce((sum,x) => sum + num(x.setting), 0);
+
+  const preOffHours = base + zoneFee + tunFee + toiletFee + deepFee + urgentFee + linenFee + petsFee + extrasFee;
+
+  const isWeekend  = weekday === "sat" || weekday === "sun";
+  const timeHour   = parseInt((time || "0:0").split(":")[0], 10) || 0;
+  const isAfter16  = timeHour >= 16;
+  const isOffHours = isWeekend || isAfter16;
+  const offHoursFee = isOffHours ? preOffHours * num("s_offhours")/100 : 0;
+
+  const subtotal = preOffHours + offHoursFee;
+
+  const isRecurring = booking === "recurring";
+  let discPct = 0;
+  if(isRecurring) discPct = freq === "weekly" ? num("s_discW") : freq === "biweekly" ? num("s_discB") : num("s_discM");
+  const discAmt = subtotal * discPct/100;
+  const total = subtotal - discAmt;
+
+  const cleanMin = num("a_clean");
+  const driveMin = roundT;
+  const hours    = (cleanMin + driveMin) / 60;
+  const wageCost = hours * num("s_wage");
+  const cost     = wageCost + tunFee;
+  const gm       = total - cost;
+  const gmPct    = total > 0 ? gm / total * 100 : 0;
+  const target   = num("s_gmt");
+  const gmStatus = gmPct >= target ? "g" : gmPct >= target - 15 ? "y" : "r";
+
+  return {loc, place, size, km, kmRT, roundT, toilets, extraToi, persons, base, baseLbl, individual,
+          booking, deep, freq, weekday, time, urgent, linen,
+          zoneFee, zoneName, tunKey, tunFee, toiletFee, deepFee, urgentFee, linenFee,
+          petsFee, extrasList, extrasFee,
+          isOffHours, offHoursFee, isRecurring, discPct, discAmt, subtotal, total,
+          cleanMin, driveMin, hours, wageCost, cost, gm, gmPct, gmStatus};
+}
+
+/* ==================== VISNING ==================== */
+const vatx = n => state.vat ? n*1.25 : n;
+
+function buildRail(){
+  let h = "";
+  BASE.forEach((b,i) => {
+    const lbl = i === 0 ? f("upTo",{x:kr(b.max)})
+              : b.individual ? f("above",{x:kr(BASE[i-1].max)})
+              : f("range",{a:kr(BASE[i-1].max+1), b:kr(b.max)});
+    h += "<tr><td>" + lbl + (b.individual ? '<span class="sm">' + t("individual") + "</span>" : "")
+       + "</td><td>" + kr(vatx(b.price)) + "</td></tr>";
+  });
+  $("tBase").innerHTML = h;
+
+  h = "";
+  ZONES.forEach((z,i) => {
+    const rng = i === 0 ? f("minUpTo",{x:kr(z.maxRT)})
+              : z.maxRT === Infinity ? f("minOver",{x:kr(ZONES[i-1].maxRT)})
+              : f("minRange",{a:kr(ZONES[i-1].maxRT), b:kr(z.maxRT)});
+    h += "<tr><td>" + t(z.key) + '<span class="sm">' + rng + "</span></td><td>" + kr(vatx(z.fee)) + "</td></tr>";
+  });
+  $("tZones").innerHTML = h;
+
+  h = "";
+  Object.keys(TUNNELS).forEach(k => h += "<tr><td>" + tunName(k) + "</td><td>" + kr(vatx(TUNNELS[k].fee)) + "</td></tr>");
+  $("tTunnels").innerHTML = h;
+
+  $("tExtras").innerHTML = "<tr><td>" + t("toiletL") + "</td><td>" + kr(vatx(TOILET_EXTRA)) + "</td></tr>";
+}
+
+function buildPlaces(){
+  const keep = $("a_loc").value;
+  let h = "";
+  PLACES.forEach(g => {
+    h += '<optgroup label="' + g[0] + '">';
+    g[1].forEach(p => h += '<option value="' + p[0] + '">' + p[0] + "</option>");
+    h += "</optgroup>";
+  });
+  $("a_loc").innerHTML = h;
+  $("a_loc").value = PLACE[keep] ? keep : "Tórshavn";
+}
+
+function syncVisibility(){
+  const booking = $("a_booking").value;
+  const isOnce = booking === "once";
+  const isRecurring = booking === "recurring";
+  $("wrapDeep").classList.toggle("hide", !isOnce);
+  $("wrapFreq").classList.toggle("hide", !isRecurring);
+  if(!isOnce) $("a_deep").checked = false;
+}
+
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.title = "Klárt · " + t("appTitle");
+  document.querySelectorAll("[data-t]").forEach(el => el.textContent = t(el.dataset.t));
+  $("driveNote").textContent = t("driveNote");
+  $("foot1").innerHTML = t("foot1");
+  $("vatBtn").textContent   = state.vat ? t("showExcl") : t("showIncl");
+  $("copyBtn").textContent  = t("copy");
+  $("saveBtn").textContent  = t("save");
+  $("printBtn").textContent = t("print");
+  $("vatlbl").textContent   = state.vat ? t("vatOn") : t("vatOff");
+  $("langs").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.lang === lang));
+  $("importMsg").textContent = "";
+  render();
+}
+
+let last = null;
+
+function render(){
+  buildRail();
+  syncVisibility();
+  const c = calc(); last = c;
+  const manualKm = KM_OVERRIDE[c.loc] !== undefined;
+
+  $("locInfo").textContent = f("locInfo",{kmr:kr1(c.kmRT), r:kr(c.roundT), z:c.zoneName, t:tunName(c.tunKey)});
+  $("kmSrc").textContent = manualKm ? t("kmManual") : t("kmAuto");
+  $("kmSrc").classList.toggle("est", manualKm);
+  $("cleanSrc").textContent = state.manualClean ? t("cleanManual") : t("cleanAuto");
+  $("sizeInfo").textContent = c.baseLbl;
+  $("toiletInfo").textContent = c.extraToi
+    ? f("toiletExtra",{n:kr(c.extraToi), kr:kr(vatx(c.toiletFee))}) : t("toiletNone");
+
+  $("flag300").textContent = t("flag300");
+  $("flag300").classList.toggle("on", c.individual);
+
+  $("petsPriceLbl").textContent = "+" + kr(vatx(num("s_pets"))) + " " + t("kr");
+  $("petsTiles").querySelectorAll(".tile").forEach(el =>
+    el.classList.toggle("sel", el.dataset.val === (petsYes ? "yes" : "no")));
+
+  EXTRAS.forEach(x => { $(x.btn).textContent = "+" + kr(vatx(num(x.setting))) + " " + t("kr"); });
+  $("extrasTiles").querySelectorAll(".tile").forEach(el =>
+    el.classList.toggle("sel", extrasSel.has(el.dataset.key)));
+
+  $("bigLbl").textContent = state.vat ? t("priceIncl") : t("priceExcl");
+  $("bigAmt").innerHTML   = kr(vatx(c.total)) + "<small>" + t("kr") + "</small>";
+  $("bigAlt").textContent = state.vat ? f("altExcl",{x:kr(c.total)}) : f("altIncl",{x:kr(c.total*1.25)});
+
+  const schedLbl = c.isRecurring
+      ? f("schedRecurring",{f:t(c.freq==="weekly"?"optWeekly":c.freq==="biweekly"?"optBiweekly":"optMonthly"),
+                             d:t("d"+c.weekday.charAt(0).toUpperCase()+c.weekday.slice(1)), t:c.time})
+      : t("schedOnce");
+
+  $("kpis").innerHTML =
+      kpi(t("kpiSchedule"), schedLbl, "", "sm")
+    + kpi(t("kpiZone"),   c.zoneName, "", "sm")
+    + kpi(t("kpiTunnel"), tunName(c.tunKey), "", "sm")
+    + kpi(t("kpiGm"),     kr(c.gmPct), "%", c.gmStatus);
+
+  $("inclNote").textContent = t("inclNote");
+
+  const gmw = Math.max(0, Math.min(100, c.gmPct));
+  $("bd").innerHTML =
+      "<div><h4>" + t("bdBuild") + "</h4><dl>"
+      + line(t("bdBase")   + ", " + c.baseLbl, kr(vatx(c.base)))
+      + line(t("bdTravel") + ", " + c.zoneName + " · " + kr1(c.kmRT) + " " + f("roundTrip",{m:kr(c.roundT)}), kr(vatx(c.zoneFee)))
+      + line(t("bdTunnel") + ", " + tunName(c.tunKey), kr(vatx(c.tunFee)))
+      + (c.extraToi ? line(f("bdToilets",{n:kr(c.extraToi)}), kr(vatx(c.toiletFee))) : "")
+      + (c.deepFee ? line(t("bdDeep"), kr(vatx(c.deepFee))) : "")
+      + (c.urgentFee ? line(t("bdUrgent"), kr(vatx(c.urgentFee))) : "")
+      + (c.linenFee ? line(f("bdLinen",{n:kr(c.persons)}), kr(vatx(c.linenFee))) : "")
+      + (c.petsFee ? line(t("bdPets"), kr(vatx(c.petsFee))) : "")
+      + c.extrasList.map(x => line(t(x.labelKey), kr(vatx(num(x.setting))))).join("")
+      + (c.offHoursFee ? line(t("bdOffHours") + " (" + kr(num("s_offhours")) + "%)", kr(vatx(c.offHoursFee))) : "")
+      + (c.discAmt ? '<dt>' + t("bdDisc") + " (" + kr(c.discPct) + "%)</dt><dd class=\"neg\">−" + kr(vatx(c.discAmt)) + "</dd>" : "")
+      + '<div class="tot"><dt>' + (state.vat ? t("totalIncl") : t("totalExcl")) + "</dt><dd>" + kr(vatx(c.total)) + "</dd></div>"
+      + "</dl></div>"
+
+    + "<div><h4>" + t("bdMargin") + "</h4><dl>"
+      + line(f("mmClean",{x:kr(c.cleanMin)}), kr1(c.cleanMin/60) + " " + t("uHours"))
+      + line(f("mmDrive",{x:kr(c.roundT)}), kr1(c.driveMin/60) + " " + t("uHours"))
+      + line(f("bdWageLine",{h:kr1(c.hours), x:kr(num("s_wage"))}), kr(c.wageCost))
+      + line(t("bdTunCost"), kr(c.tunFee))
+      + line(t("bdCost"), kr(c.cost))
+      + '<div class="tot"><dt>' + t("bdGross") + "</dt><dd>" + kr(c.gm) + "</dd></div>"
+      + "</dl>"
+      + '<div class="bar"><span class="cost" style="width:' + (100-gmw) + '%"></span><span class="gm" style="width:' + gmw + '%"></span></div>'
+      + '<div class="leg"><span>' + t("legCost") + " <b>" + kr(c.cost) + " " + t("kr") + "</b></span>"
+      + "<span>" + t("legGm") + " <b>" + kr(c.gmPct) + " %</b></span></div>"
+      + "</div>";
+}
+
+const kpi  = (k,v,u,cls) => '<div class="kpi"><div class="k">'+k+'</div><div class="v'+(cls?" "+cls:"")+'">'
+                          + v + (u ? "<small>"+u+"</small>" : "") + "</div></div>";
+const line = (label,val) => "<dt>" + label + "</dt><dd>" + val + "</dd>";
+
+/* ==================== HÆNDELSER ==================== */
+document.querySelectorAll(".panel > h2").forEach(h =>
+  h.addEventListener("click", () => h.parentElement.classList.toggle("closed")));
+
+$("petsTiles").addEventListener("click", e => {
+  const b = e.target.closest(".tile"); if(!b) return;
+  petsYes = b.dataset.val === "yes";
+  render();
+});
+
+$("extrasTiles").addEventListener("click", e => {
+  const b = e.target.closest(".tile"); if(!b) return;
+  const key = b.dataset.key;
+  if(extrasSel.has(key)) extrasSel.delete(key); else extrasSel.add(key);
+  render();
+});
+
+function syncClean(){
+  if(!state.manualClean){
+    $("a_clean").value = Math.round(autoClean(num("a_size"), num("a_toilets"), $("a_booking").value, $("a_deep").checked));
+  }
+}
+
+function syncPlace(){
+  const loc = $("a_loc").value;
+  $("a_km").value = kmOf(loc);
+  syncClean();
+}
+
+$("a_loc").addEventListener("change", () => { syncPlace(); render(); });
+
+$("a_km").addEventListener("input", () => {
+  const loc = $("a_loc").value, v = num("a_km");
+  if(PLACE[loc] && v !== PLACE[loc].km) KM_OVERRIDE[loc] = v; else delete KM_OVERRIDE[loc];
+  render();
+});
+
+["a_size","a_toilets","a_persons","a_booking","a_deep","a_freq","a_weekday","a_time","a_urgent","a_linen"].forEach(id =>
+  $(id).addEventListener((id === "a_deep" || id === "a_urgent" || id === "a_linen") ? "change" : "input", () => { syncClean(); render(); }));
+
+$("a_clean").addEventListener("input", () => {
+  state.manualClean = num("a_clean") !== Math.round(autoClean(num("a_size"), num("a_toilets"), $("a_booking").value, $("a_deep").checked));
+  render();
+});
+
+["s_wage","s_gmt","s_speed","s_deepMin","s_deepStep","s_deepExtraMin","s_urgent","s_linen","s_pets","s_exOven","s_exFridge","s_exFreezer","s_exWindows","s_exCabinets","s_exDeep","s_offhours","s_discW","s_discB","s_discM"].forEach(id => $(id).addEventListener("input", () => {
+  if(id === "s_wage") $(id).classList.remove("flag");
+  else if(["s_deepMin","s_deepStep","s_deepExtraMin","s_urgent","s_linen","s_pets","s_exOven","s_exFridge","s_exFreezer","s_exWindows","s_exCabinets","s_exDeep","s_offhours","s_discW","s_discB","s_discM"].includes(id)) $(id).classList.remove("flag");
+  syncClean();
+  render();
+}));
+
+/* --- indsæt km fra Landsverk --- */
+function norm(s){ return s.toLowerCase().replace(/[.,;:]+$/,"").trim(); }
+const NORM = {}; Object.keys(PLACE).forEach(k => NORM[norm(k)] = k);
+
+$("importBtn").addEventListener("click", () => {
+  const lines = $("importBox").value.split(/\r?\n/);
+  let ok = 0, bad = 0;
+  lines.forEach(raw => {
+    const s = raw.trim(); if(!s) return;
+    const m = s.match(/^(.*?)[\s\t:;=]+(-?[\d]+(?:[.,]\d+)?)\s*(?:km)?$/i);
+    if(!m){ bad++; return; }
+    const name = NORM[norm(m[1])];
+    const km = parseFloat(m[2].replace(",", "."));
+    if(name === undefined || isNaN(km)){ bad++; return; }
+    if(km === PLACE[name].km) delete KM_OVERRIDE[name]; else KM_OVERRIDE[name] = km;
+    ok++;
+  });
+  const msg = $("importMsg");
+  if(ok === 0){ msg.textContent = t("importNone"); msg.classList.add("bad"); }
+  else {
+    msg.textContent = f("importOk",{n:ok}) + (bad ? " " + f("importUnknown",{n:bad}) : "");
+    msg.classList.toggle("bad", false);
+  }
+  syncPlace(); render();
+});
+
+$("resetKmBtn").addEventListener("click", () => {
+  Object.keys(KM_OVERRIDE).forEach(k => delete KM_OVERRIDE[k]);
+  $("importBox").value = "";
+  const msg = $("importMsg"); msg.textContent = t("resetOk"); msg.classList.remove("bad");
+  syncPlace(); render();
+});
+
+$("langs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  lang = b.dataset.lang; applyLang();
+});
+
+$("vatBtn").addEventListener("click", () => {
+  state.vat = !state.vat;
+  $("vatBtn").textContent = state.vat ? t("showExcl") : t("showIncl");
+  $("vatBtn").classList.toggle("on", state.vat);
+  $("vatlbl").textContent = state.vat ? t("vatOn") : t("vatOff");
+  render();
+});
+$("printBtn").addEventListener("click", () => window.print());
+
+$("copyBtn").addEventListener("click", () => {
+  const c = last, K = t("kr"), out = [];
+  out.push(t("cTitle"));
+  out.push(f("cSpec",{loc:c.loc, s:kr(c.size), km:kr1(c.kmRT), o:kr(c.roundT)}));
+  out.push(f("cToilets",{n:kr(c.toilets)}));
+  if(c.isRecurring) out.push(f("schedRecurring",{f:t(c.freq==="weekly"?"optWeekly":c.freq==="biweekly"?"optBiweekly":"optMonthly"),
+                             d:t("d"+c.weekday.charAt(0).toUpperCase()+c.weekday.slice(1)), t:c.time}));
+  else out.push(t("schedOnce") + " · " + c.time);
+  out.push("");
+  out.push(t("bdBase")   + " (" + c.baseLbl + "): " + kr(c.base) + " " + K);
+  out.push(t("bdTravel") + " (" + c.zoneName + "): " + kr(c.zoneFee) + " " + K);
+  out.push(t("bdTunnel") + " (" + tunName(c.tunKey) + "): " + kr(c.tunFee) + " " + K);
+  if(c.extraToi) out.push(f("bdToilets",{n:kr(c.extraToi)}) + ": " + kr(c.toiletFee) + " " + K);
+  if(c.deepFee) out.push(t("bdDeep") + ": " + kr(c.deepFee) + " " + K);
+  if(c.urgentFee) out.push(t("bdUrgent") + ": " + kr(c.urgentFee) + " " + K);
+  if(c.linenFee) out.push(f("bdLinen",{n:kr(c.persons)}) + ": " + kr(c.linenFee) + " " + K);
+  if(c.petsFee) out.push(t("bdPets") + ": " + kr(c.petsFee) + " " + K);
+  c.extrasList.forEach(x => out.push(t(x.labelKey) + ": " + kr(num(x.setting)) + " " + K));
+  if(c.offHoursFee) out.push(t("bdOffHours") + " (" + kr(num("s_offhours")) + "%): " + kr(c.offHoursFee) + " " + K);
+  if(c.discAmt) out.push(t("bdDisc") + " (" + kr(c.discPct) + "%): -" + kr(c.discAmt) + " " + K);
+  out.push(t("totalExcl") + ": " + kr(c.total) + " " + K);
+  out.push(t("totalIncl") + ": " + kr(c.total*1.25) + " " + K);
+  out.push("");
+  out.push(f("cMargin",{x:kr(c.gm), p:kr(c.gmPct)}));
+  navigator.clipboard?.writeText(out.join("\n")).then(
+    () => flash(t("copied")), () => flash(t("copyFail")));
+});
+function flash(msg){
+  const b = $("copyBtn");
+  b.textContent = msg; b.classList.add("on");
+  setTimeout(() => { b.textContent = t("copy"); b.classList.remove("on"); }, 1800);
+}
+
+$("saveBtn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify({wage:$("s_wage").value, gmTarget:$("s_gmt").value,
+                                         speed:$("s_speed").value, km:KM_OVERRIDE, lang,
+                                         deepMin:$("s_deepMin").value, deepStep:$("s_deepStep").value, deepExtraMin:$("s_deepExtraMin").value,
+                                         urgent:$("s_urgent").value, linen:$("s_linen").value, offhours:$("s_offhours").value,
+                                         pets:$("s_pets").value, exOven:$("s_exOven").value, exFridge:$("s_exFridge").value,
+                                         exFreezer:$("s_exFreezer").value, exWindows:$("s_exWindows").value,
+                                         exCabinets:$("s_exCabinets").value, exDeep:$("s_exDeep").value,
+                                         discW:$("s_discW").value, discB:$("s_discB").value, discM:$("s_discM").value}, null, 2)],
+                        {type:"application/json"});
+  const u = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = u; a.download = "klart-b2c-opsaetning.json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(u), 1000);
+});
+
+$("loadInp").addEventListener("change", e => {
+  const file = e.target.files[0]; if(!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const dd = JSON.parse(r.result);
+      if(dd.wage !== undefined){ $("s_wage").value = dd.wage; $("s_wage").classList.remove("flag"); }
+      if(dd.gmTarget !== undefined) $("s_gmt").value = dd.gmTarget;
+      if(dd.speed !== undefined) $("s_speed").value = dd.speed;
+      if(dd.deepMin !== undefined){ $("s_deepMin").value = dd.deepMin; $("s_deepMin").classList.remove("flag"); }
+      if(dd.deepStep !== undefined){ $("s_deepStep").value = dd.deepStep; $("s_deepStep").classList.remove("flag"); }
+      if(dd.deepExtraMin !== undefined){ $("s_deepExtraMin").value = dd.deepExtraMin; $("s_deepExtraMin").classList.remove("flag"); }
+      if(dd.urgent !== undefined){ $("s_urgent").value = dd.urgent; $("s_urgent").classList.remove("flag"); }
+      if(dd.linen !== undefined){ $("s_linen").value = dd.linen; $("s_linen").classList.remove("flag"); }
+      if(dd.pets !== undefined){ $("s_pets").value = dd.pets; $("s_pets").classList.remove("flag"); }
+      if(dd.exOven !== undefined){ $("s_exOven").value = dd.exOven; $("s_exOven").classList.remove("flag"); }
+      if(dd.exFridge !== undefined){ $("s_exFridge").value = dd.exFridge; $("s_exFridge").classList.remove("flag"); }
+      if(dd.exFreezer !== undefined){ $("s_exFreezer").value = dd.exFreezer; $("s_exFreezer").classList.remove("flag"); }
+      if(dd.exWindows !== undefined){ $("s_exWindows").value = dd.exWindows; $("s_exWindows").classList.remove("flag"); }
+      if(dd.exCabinets !== undefined){ $("s_exCabinets").value = dd.exCabinets; $("s_exCabinets").classList.remove("flag"); }
+      if(dd.exDeep !== undefined){ $("s_exDeep").value = dd.exDeep; $("s_exDeep").classList.remove("flag"); }
+      if(dd.offhours !== undefined){ $("s_offhours").value = dd.offhours; $("s_offhours").classList.remove("flag"); }
+      if(dd.discW !== undefined){ $("s_discW").value = dd.discW; $("s_discW").classList.remove("flag"); }
+      if(dd.discB !== undefined){ $("s_discB").value = dd.discB; $("s_discB").classList.remove("flag"); }
+      if(dd.discM !== undefined){ $("s_discM").value = dd.discM; $("s_discM").classList.remove("flag"); }
+      Object.keys(KM_OVERRIDE).forEach(k => delete KM_OVERRIDE[k]);
+      if(dd.km) Object.keys(dd.km).forEach(k => { if(PLACE[k]) KM_OVERRIDE[k] = dd.km[k]; });
+      if(dd.lang && L[dd.lang]) lang = dd.lang;
+      state.manualClean = false;
+      syncPlace();
+      applyLang();
+    }catch(err){ alert(t("loadErr")); }
+  };
+  r.readAsText(file); e.target.value = "";
+});
+
+/* start */
+buildPlaces();
+$("a_loc").value = "Miðvágur";
+syncPlace();
+applyLang();
+</script>
+</body>
+</html>
