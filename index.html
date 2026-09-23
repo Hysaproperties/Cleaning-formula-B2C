@@ -1,23 +1,25 @@
 <!DOCTYPE html>
 <!--
-  Klárt (Vaskingen) · Prisberegner for privatkunder / B2C
-  Version 3.3.0 — 2026-09-23
+  Klárt (Vaskingen) · Cleaning price calculator, private customers / B2C
+  Version 3.6.0 — 2026-09-23
 
-  Tidsbaseret prismodel: pris = lønudgift ÷ (1 − dækningsgrad), mindst 55 %.
-  Engangsvask regnes som 15 % ekstra tid, så dækningsgraden er den samme.
-  Slutprisen rundes til nærmeste 50 kr. inkl. moms, aldrig under minimumsprisen.
-  Minimumstrappe pr. størrelse (inkl. moms); prisen er den højeste af de to.
-  Alt prissættes efter forventet tid — rengøring, toiletter, hovedrengøring,
-  sengetøj, kæledyr, ekstraopgaver og kørsel. Tunnel får samme påslag oven
-  på udgiften. Tillæg for aften/weekend og akut lægges på lønnen, så
-  dækningsgraden bevares.
+  Time-based pricing: price = wage cost / (1 - gross margin), never below 55 %.
+  Everything is priced on expected minutes - cleaning, toilets, deep cleaning,
+  bed linen, pets, extra tasks, windows and driving. Tunnel tolls are sold at
+  the same margin on top of the actual toll. Evening/weekend, urgent and
+  one-off are added to the wage as extra time, so the margin is unchanged.
+  The final price is always rounded UP to the nearest DKK 50 incl. VAT, and
+  never below the standard price for the smallest size.
 
-  Størrelsestrin, tider, køkkenopgaver og vinduestrin følger prisbladet
-  "Home Cleaning Price List" (2026-09-22). Priserne regnes med 55 % dækningsgrad og rundes altid op til 50 kr.
-  Tiderne for toiletter, hovedrengøring, sengetøj og kæledyr er stadig forslag.
+  Size steps, times, kitchen tasks and window tiers follow the price sheet
+  "Home Cleaning Price List" (2026-09-22). Deep cleaning is set to 480 minutes.
+  EVERY price here is indicative: the figure can move if the job turns out to
+  be more demanding, and deep cleaning and commercial jobs require an on-site
+  visit before a firm quote. Times for toilets, bed linen and pets are still
+  proposals.
   Single self-contained file: no build step, no dependencies.
 -->
-<html lang="da">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -176,7 +178,7 @@ textarea{width:100%;min-height:74px;padding:7px 8px;border:1px solid var(--line)
   .bigbox{background:#fff;color:var(--ink);border:1px solid var(--line)}
   .bigbox .lbl,.bigbox .alt{color:var(--ink-soft)}
 }
-/* ---- adgangslås ---- */
+/* ---- password gate ---- */
 #gate{position:fixed;inset:0;z-index:100;background:var(--ink);
   display:flex;align-items:center;justify-content:center;padding:24px}
 #gate.off{display:none}
@@ -200,7 +202,7 @@ body.locked{overflow:hidden}
 @media print{#gate{display:none!important}}
 
 @media(prefers-reduced-motion:reduce){*{transition:none!important}.shake{animation:none}}
-/* ---- tidsbaseret model ---- */
+/* ---- time-based model ---- */
 .fld .u.winhint{margin-top:-6px;font-size:11.5px}
 .plist tr.thead td{font-size:11px;color:var(--ink-faint);font-weight:500;padding-bottom:2px}
 .plist td.num{text-align:right;font-weight:600;color:var(--ink);white-space:nowrap;padding-left:10px}
@@ -239,10 +241,10 @@ body.locked{overflow:hidden}
       </svg>
     </div>
     <h2>Klárt</h2>
-    <p>Prisberegner for privatkunder</p>
-    <input type="password" id="gatePw" placeholder="Adgangskode" autocomplete="current-password"
+    <p>Price calculator, private customers</p>
+    <input type="password" id="gatePw" placeholder="Password" autocomplete="current-password"
            autocapitalize="off" spellcheck="false">
-    <button id="gateBtn" type="button">Lås op</button>
+    <button id="gateBtn" type="button">Unlock</button>
     <div id="gateErr" role="alert"></div>
   </div>
 </div>
@@ -253,8 +255,8 @@ body.locked{overflow:hidden}
     <span class="sub" id="vatlbl"></span>
     <div class="mast-tools">
       <div class="langs" id="langs">
-        <button data-lang="da" class="on">DA</button>
-        <button data-lang="en">EN</button>
+        <button data-lang="da">DA</button>
+        <button data-lang="en" class="on">EN</button>
         <button data-lang="fo">FO</button>
       </div>
       <button class="tbtn" id="vatBtn"></button>
@@ -304,7 +306,7 @@ body.locked{overflow:hidden}
       <div class="pbody">
         <p class="note" data-t="timesNote"></p>
         <div class="row"><label data-t="tToilet"></label><input type="number" id="s_mToilet" value="15" min="0" class="flag"><span class="unit" data-t="minShort"></span></div>
-        <div class="row"><label data-t="tDeep"></label><input type="number" id="s_mDeep" value="120" min="0" class="flag"><span class="unit" data-t="minShort"></span></div>
+        <div class="row"><label data-t="tDeep"></label><input type="number" id="s_mDeep" value="480" min="0" class="flag"><span class="unit" data-t="minShort"></span></div>
         <div class="row"><label data-t="tLinen"></label><input type="number" id="s_mLinen" value="10" min="0" class="flag"><span class="unit" data-t="minShort"></span></div>
         <div class="row"><label data-t="tPets"></label><input type="number" id="s_mPets" value="40" min="0" class="flag"><span class="unit" data-t="minShort"></span></div>
         <div class="row"><label data-t="exFridge"></label><input type="number" id="s_mFridge" value="40" min="0"><span class="unit" data-t="minShort"></span></div>
@@ -380,6 +382,14 @@ body.locked{overflow:hidden}
           <span class="u" id="cleanSrc">&nbsp;</span>
         </div>
 
+        <div class="fld">
+          <label for="a_customer" data-t="fCustomer"></label>
+          <select id="a_customer">
+            <option value="private" data-t="optPrivate"></option>
+            <option value="business" data-t="optBusiness"></option>
+          </select>
+          <span class="u" id="customerInfo">&nbsp;</span>
+        </div>
         <div class="fld">
           <label for="a_booking" data-t="fBooking"></label>
           <select id="a_booking">
@@ -468,6 +478,7 @@ body.locked{overflow:hidden}
         <button class="sbtn addbtn" id="exAdd" type="button" data-t="exAdd"></button>
       </div>
 
+      <div class="flagbox" id="flagVisit"></div>
       <div class="flagbox" id="flag300"></div>
       <div class="flagbox" id="flagWin"></div>
 
@@ -496,7 +507,7 @@ body.locked{overflow:hidden}
 </div>
 
 <script>
-/* ==================== adgangslås ==================== */
+/* ==================== password gate ==================== */
 var PW_HASH = "76e829d2928c41954ecbc03af0000ee06386905ac942fd5f51c845b00ab439d2";
 
 function sha256(str){
@@ -563,7 +574,7 @@ function sha256(str){
       var first=document.getElementById("a_loc");
       if(first) first.focus();
     } else {
-      err.textContent="Forkert adgangskode";
+      err.textContent="Wrong password";
       box.classList.remove("shake");
       void box.offsetWidth;
       box.classList.add("shake");
@@ -580,15 +591,15 @@ function sha256(str){
 <script>
 "use strict";
 
-/* ==================== PRISMODEL ====================
-   Én regel for alt:  pris = lønudgift × (1 + påslag)
-   Lønudgift = forventet tid × timeløn. Det gælder rengøring, toiletter,
-   hovedrengøring, sengetøj, kæledyr, ekstraopgaver OG kørsel. Tunnel får
-   samme påslag oven på den faktiske udgift.
-   Tillæg for aften/weekend og akut lægges på lønnen, så påslaget bevares.
-   Rabat ved fast aftale trækkes fra prisen til sidst.
-   Eksempel ved 50 % påslag: 1.000 kr. i løn → 1.500 kr. i pris.            */
-/* standardvasketid, 1 person — prisbladet (Home Cleaning Price List), midten af tidsintervallet */
+/* ==================== PRICING MODEL ====================
+   One rule for everything:  price = wage cost / (1 - gross margin)
+   Wage cost = expected minutes x hourly wage. This covers cleaning, toilets,
+   deep cleaning, bed linen, pets, extra tasks AND driving. Tunnel tolls are
+   sold at the same margin on top of the actual toll.
+   Evening/weekend, urgent and one-off are added to the WAGE as extra time,
+   so the gross margin is unchanged by them.
+   Every price is rounded up to the nearest DKK 50 incl. VAT.               */
+/* standard cleaning time, one person - from the Home Cleaning Price List, middle of each range */
 const STD = [
   {max:70,  min:85,  rng:"75–90"},
   {max:90,  min:110, rng:"85–135"},
@@ -600,14 +611,14 @@ const STD = [
   {max:300, min:260, rng:"240–280"},
   {max:Infinity, min:300, individual:true}
 ];
-const TUNNELS = {                      /* faktisk udgift tur-retur */
+const TUNNELS = {                      /* actual toll, round trip */
   none:     {key:"tunNone",                        cost:0},
   vagar:    {name:"Vágatunnilin",                  cost:20},
   eysturoy: {name:"Eysturoyartunnilin",            cost:150},
   klaksvik: {name:"Eysturoyar- + Norðoyatunnilin", cost:170},
   sandoy:   {name:"Sandoyartunnilin",              cost:150}
 };
-/* ekstraopgaver: standardtid hentes fra indstillingen */
+/* extra tasks: the standard time comes from the setting */
 const TASKS = [
   {key:"fridge",        label:"exFridge",        setting:"s_mFridge"},
   {key:"freezer",       label:"exFreezer",       setting:"s_mFreezer"},
@@ -619,8 +630,9 @@ const TASKS = [
 ];
 const TASK = {}; TASKS.forEach(x => TASK[x.key] = x);
 
-/* vinduespudsning indvendigt efter antal — prisbladet har kun priser, så tiden
-   pr. trin er regnet baglæns, så prisen passer ved 55 % dækningsgrad */
+/* window cleaning, inside only, by number of windows. The price sheet lists
+   prices but no times, so the minutes per tier are worked backwards from the
+   sheet's prices at a 55 % gross margin. Re-derive them if the margin changes. */
 const WIN = [
   {min:1,  max:5,  setting:"s_w5"},
   {min:6,  max:10, setting:"s_w10"},
@@ -631,16 +643,16 @@ const WIN = [
 function winMinutes(n){
   if(n <= 0) return 0;
   const tier = WIN.find(w => n <= w.max);
-  return tier ? num(tier.setting) : num("s_w30") * n / 30;   /* over 30: skaleret, individuelt tilbud */
+  return tier ? num(tier.setting) : num("s_w30") * n / 30;   /* above 30: scaled, individual quote */
 }
 
-/* Gulve der aldrig kan brydes:
-   - dækningsgraden kan aldrig komme under MIN_DG, heller ikke efter rabat
-   - ingen opgave koster under minimumstrappen for størrelsen (s_st…, inkl. moms) */
-const MIN_DG = 55;           /* dækningsgraden kan aldrig komme under dette */
+/* Hard floors that can never be broken:
+   - the gross margin can never fall below MIN_DG
+   - no job costs less than the standard price for the smallest size        */
+const MIN_DG = 55;           /* the gross margin can never fall below this */
 const VAT = 1.25;
 
-/* ==================== AFSTANDE ==================== */
+/* ==================== ROAD DISTANCES ==================== */
 const PLACES = [
 ["Streymoy",[
  ["Tórshavn",0,"none"],["Argir",3,"none"],["Hoyvík",3,"none"],["Hvítanes",8,"none"],
@@ -677,7 +689,7 @@ const PLACES = [
 const PLACE = {};
 PLACES.forEach(g => g[1].forEach(p => PLACE[p[0]] = {km:p[1], tunnel:p[2]}));
 
-/* ==================== SPROG ==================== */
+/* ==================== LANGUAGES ==================== */
 const L = {
  "da": {
   "appTitle": "Prisberegner for privatkunder",
@@ -756,7 +768,7 @@ const L = {
   "kr": "kr.",
   "totalExcl": "I alt ekskl. moms",
   "totalIncl": "I alt inkl. moms",
-  "inclNote": "Prisen dækker rengøring af hele boligen som angivet. Der beregnes ikke tillæg pr. person, medmindre sengetøj er valgt.",
+  "inclNote": "Alle priser er vejledende. Viser opgaven sig at være mere krævende end forventet, kan prisen ændre sig. Prisen dækker rengøring af hele boligen som beskrevet; der er ikke tillæg pr. person, medmindre sengetøj er valgt.",
   "bdTunnel": "Tunnel",
   "footTitle": "Værd at vide",
   "foot1": "Afstandene er km ad vej fra Tórshavn med de nuværende tunneller. Slå jeres egne op i <a href=\"https://lv.fo/vegateinur/indexTwo.php\" target=\"_blank\" rel=\"noopener\">Landsverks vegaroknari</a> og indsæt dem i venstre spalte. Indtast dem én vej — beregneren fordobler selv.",
@@ -770,13 +782,13 @@ const L = {
   "stdMin": "{m} min standard",
   "tunnelNote": "Priser inkl. moms, tur-retur, med påslag oven på udgiften. Følger automatisk af beliggenheden.",
   "tunCostLbl": "udgift {x} kr.",
-  "pRate": "Løn og påslag",
+  "pRate": "Løn og dækningsgrad",
   "wageL": "Løn, kr./t",
   "rateNote": "1 time koster {w} kr. i løn og sælges til {r} kr. {d} % dækningsgrad svarer til {m} % påslag.",
   "pTimes": "Standardtider, minutter",
   "timesNote": "Den tid der lægges på, når en opgave vælges. Kan rettes på den enkelte tur.",
   "tToilet": "Toilet ud over det første",
-  "tDeep": "Hovedrengøring, ekstra tid",
+  "tDeep": "Hovedrengøring, ekstra tid (vejledende)",
   "tLinen": "Sengetøj, pr. person",
   "tPets": "Kæledyr",
   "feesNote": "Engangsvask, aften/weekend og akut lægges på lønnen som ekstra tid, så dækningsgraden holder.",
@@ -855,7 +867,19 @@ const L = {
   "stdRange": "{m} min · prisblad {r}",
   "optTriweekly": "Hver 3. uge",
   "onlyOnce": "Kun ved engangsvask.",
-  "onlyRecurring": "Kun ved fast aftale."
+  "onlyRecurring": "Kun ved fast aftale.",
+  "fCustomer": "Kundetype",
+  "optPrivate": "Privat bolig",
+  "optBusiness": "Erhverv",
+  "whatDeep": "hovedrengøring",
+  "whatBusiness": "erhvervsrengøring",
+  "andWord": "og",
+  "visitNote": "Vi skal se opgaven, før vi kan give en endelig pris på {what}. Tallet herunder er vejledende.",
+  "visitShort": "Kræver besigtigelse.",
+  "priceGuideExcl": "Vejledende pris ekskl. moms",
+  "priceGuideIncl": "Vejledende pris inkl. 25 % moms",
+  "cVisit": "Vi skal se opgaven, før vi kan give en endelig pris på {what}. Prisen ovenfor er vejledende.",
+  "cGuide": "Vejledende pris. Viser opgaven sig at være mere krævende end forventet, kan prisen ændre sig."
  },
  "en": {
   "appTitle": "Price calculator for private customers",
@@ -934,7 +958,7 @@ const L = {
   "kr": "DKK",
   "totalExcl": "Total excl. VAT",
   "totalIncl": "Total incl. VAT",
-  "inclNote": "The price covers cleaning of the whole home as specified. There is no per-person supplement unless bed linen is selected.",
+  "inclNote": "All prices are indicative. If the job turns out to be more demanding than expected, the price may change. The price covers cleaning the whole home as described; there is no per-person supplement unless bed linen is selected.",
   "bdTunnel": "Tunnel",
   "footTitle": "Worth knowing",
   "foot1": "Distances are road kilometres from Tórshavn using the current tunnels. Look your own up in <a href=\"https://lv.fo/vegateinur/indexTwo.php\" target=\"_blank\" rel=\"noopener\">Landsverk's road calculator</a> and paste them into the left-hand panel. Enter them one way — the calculator doubles them itself.",
@@ -948,13 +972,13 @@ const L = {
   "stdMin": "{m} min standard",
   "tunnelNote": "Prices incl. VAT, round trip, with markup on top of the cost. Set automatically by the location.",
   "tunCostLbl": "cost DKK {x}",
-  "pRate": "Wage and markup",
+  "pRate": "Wage and gross margin",
   "wageL": "Wage, DKK/h",
   "rateNote": "One hour costs {w} DKK in wages and sells for {r} DKK. A {d}% gross margin equals a {m}% markup.",
   "pTimes": "Standard times, minutes",
   "timesNote": "The time added when a task is selected. Can be changed for the individual job.",
   "tToilet": "Toilet beyond the first",
-  "tDeep": "Deep clean, extra time",
+  "tDeep": "Deep clean, extra time (indicative)",
   "tLinen": "Bed linen, per person",
   "tPets": "Pets",
   "feesNote": "One-off, evening/weekend and urgent are added to wages as extra time, so the gross margin holds.",
@@ -1033,7 +1057,19 @@ const L = {
   "stdRange": "{m} min · price sheet {r}",
   "optTriweekly": "Every 3 weeks",
   "onlyOnce": "One-off cleans only.",
-  "onlyRecurring": "Regular bookings only."
+  "onlyRecurring": "Regular bookings only.",
+  "fCustomer": "Customer type",
+  "optPrivate": "Private home",
+  "optBusiness": "Business",
+  "whatDeep": "deep cleaning",
+  "whatBusiness": "commercial cleaning",
+  "andWord": "and",
+  "visitNote": "We need to see the job before we can give a final price for {what}. The figure below is indicative.",
+  "visitShort": "Requires an on-site visit.",
+  "priceGuideExcl": "Indicative price excl. VAT",
+  "priceGuideIncl": "Indicative price incl. 25% VAT",
+  "cVisit": "We need to see the job before we can give a final price for {what}. The price above is indicative.",
+  "cGuide": "Indicative price. If the job turns out to be more demanding than expected, the price may change."
  },
  "fo": {
   "appTitle": "Prísroknari fyri privatkundar",
@@ -1112,7 +1148,7 @@ const L = {
   "kr": "kr.",
   "totalExcl": "Tilsamans uttan MVG",
   "totalIncl": "Tilsamans við MVG",
-  "inclNote": "Prísurin fevnir um reingerð av øllum húsinum sum uppgivið. Einki íkast fyri hvønn persón, uttan tá rúmfatnaður er valt.",
+  "inclNote": "Allir prísir eru vegleiðandi. Vísir uppgávan seg at vera meira krevjandi enn væntað, kann prísurin broytast. Prísurin fevnir um reingerð av øllum bústaðnum sum lýst; einki íkast fyri hvønn persón, uttan so at rúmfatnaður er valdur.",
   "bdTunnel": "Tunnil",
   "footTitle": "Vert at vita",
   "foot1": "Vegalongdirnar eru km eftir vegnum frá Tórshavn við teimum tunlunum, sum eru í dag. Flet tykkara egnu upp í <a href=\"https://lv.fo/vegateinur/indexTwo.php\" target=\"_blank\" rel=\"noopener\">vegaroknaranum hjá Landsverki</a> og set tær inn í vinstru spaltuni. Skriva tær ein veg — roknarin tvífaldar sjálvur.",
@@ -1126,13 +1162,13 @@ const L = {
   "stdMin": "{m} min vanligt",
   "tunnelNote": "Prísir við MVG, fram og aftur, við álagningi omaná útreiðsluna. Verður settur sjálvvirkandi eftir staðsetingini.",
   "tunCostLbl": "útreiðsla {x} kr.",
-  "pRate": "Løn og álagningur",
+  "pRate": "Løn og dekningsgrad",
   "wageL": "Løn, kr./t",
   "rateNote": "1 tími kostar {w} kr. í løn og verður seldur fyri {r} kr. {d} % dekningsgrad svarar til {m} % álagning.",
   "pTimes": "Vanligar tíðir, minuttir",
   "timesNote": "Tíðin sum verður løgd afturat, tá ein uppgáva verður vald. Kann rættast fyri einstaka túrin.",
   "tToilet": "Vesi umframt tað fyrsta",
-  "tDeep": "Høvuðsreingerð, eyka tíð",
+  "tDeep": "Høvuðsreingerð, eyka tíð (vegleiðandi)",
   "tLinen": "Rúmfatnaður, fyri hvønn persón",
   "tPets": "Djór",
   "feesNote": "Eingangsvask, kvøld/vikuskifti og skjót bílegging verða løgd á lønina sum eyka tíð, so dekningsgradin heldur.",
@@ -1211,11 +1247,23 @@ const L = {
   "stdRange": "{m} min · prísblað {r}",
   "optTriweekly": "Triðju hvørja viku",
   "onlyOnce": "Bert við eingangsvaski.",
-  "onlyRecurring": "Bert við fastari avtalu."
+  "onlyRecurring": "Bert við fastari avtalu.",
+  "fCustomer": "Kundaslag",
+  "optPrivate": "Privatur bústaður",
+  "optBusiness": "Vinnurekstur",
+  "whatDeep": "høvuðsreingerð",
+  "whatBusiness": "vinnureingerð",
+  "andWord": "og",
+  "visitNote": "Vit mugu síggja uppgávuna, áðrenn vit kunnu geva endaligan prís á {what}. Talið niðanfyri er vegleiðandi.",
+  "visitShort": "Krevur, at vit koma og hyggja.",
+  "priceGuideExcl": "Vegleiðandi prísur uttan MVG",
+  "priceGuideIncl": "Vegleiðandi prísur við 25 % MVG",
+  "cVisit": "Vit mugu síggja uppgávuna, áðrenn vit kunnu geva endaligan prís á {what}. Prísurin omanfyri er vegleiðandi.",
+  "cGuide": "Vegleiðandi prísur. Vísir uppgávan seg at vera meira krevjandi enn væntað, kann prísurin broytast."
  }
 };
 
-let lang = "da";
+let lang = "en";
 const t = k => (L[lang] && L[lang][k] !== undefined) ? L[lang][k] : (L.da[k] !== undefined ? L.da[k] : k);
 const f = (k,o) => { let s = t(k); for(const p in o) s = s.split("{"+p+"}").join(o[p]); return s; };
 const locale = () => lang === "en" ? "en-GB" : "da-DK";
@@ -1235,23 +1283,23 @@ const KM_OVERRIDE = {};
 const kmOf   = loc => KM_OVERRIDE[loc] !== undefined ? KM_OVERRIDE[loc] : (PLACE[loc] ? PLACE[loc].km : 0);
 const minsOf = km  => { const s = num("s_speed") || 1; return Math.round(km / s * 60); };
 
-/* --- satser --- */
+/* --- rates --- */
 const wage    = () => Math.max(0, num("s_wage"));
-const dg      = () => Math.min(95, Math.max(MIN_DG, num("s_dg"))) / 100;   /* dækningsgrad, mindst 50 % */
-const markup  = () => dg() / (1 - dg());                                    /* påslag der giver den dækningsgrad */
-const sellMin = () => wage() / 60 / (1 - dg());                             /* salgspris pr. minut, uden tillæg */
-/* Laveste pris: standardprisen for den mindste størrelse, ved samme dækningsgrad. */
+const dg      = () => Math.min(95, Math.max(MIN_DG, num("s_dg"))) / 100;   /* gross margin, never below MIN_DG */
+const markup  = () => dg() / (1 - dg());                                    /* the markup that produces that gross margin */
+const sellMin = () => wage() / 60 / (1 - dg());                             /* selling price per minute, before surcharges */
+/* Lowest price: the standard price for the smallest size, at the same margin. */
 const minFloorEx = () => STD[0].min * sellMin();
 
-/* Slutpris: løft til gulvet (mindste dækningsgrad / minimumspris), rund til nærmeste
-   50 kr. inkl. moms (op eller ned), men aldrig ned under minimumsprisen.        */
+/* Final price: lift to the floor (minimum margin / minimum price), then round
+   UP to the nearest DKK 50 incl. VAT, never below the minimum price.           */
 function finalPrice(subtotal, cost, stairFloor){
   const dgFloor = cost / (1 - MIN_DG/100);
   const minTop  = Math.max(0, stairFloor - subtotal);
   const base    = Math.max(subtotal + minTop, dgFloor);
   const raw     = Math.round(base * VAT * 100) / 100;
-  let inc       = Math.ceil(raw / 50 - 1e-9) * 50;       /* altid op, så dækningsgraden aldrig falder */
-  const minIncl = Math.round(Math.round(stairFloor * VAT * 100) / 100 / 50) * 50;   /* laveste listepris */
+  let inc       = Math.ceil(raw / 50 - 1e-9) * 50;       /* always up, so the margin never drops */
+  const minIncl = Math.round(Math.round(stairFloor * VAT * 100) / 100 / 50) * 50;   /* lowest list price */
   if(inc < minIncl) inc = minIncl;
   return {minTop, total: inc / VAT, totalIncl: inc};
 }
@@ -1265,11 +1313,11 @@ function sizeLabel(i){
        : f("range",{a:kr(STD[i-1].max+1), b:kr(STD[i].max)});
 }
 
-/* --- opgavelinjer: valgte ekstraopgaver + frie linjer --- */
+/* --- task lines: selected extra tasks plus free-text lines --- */
 let ROWS = [];   /* {key|null, name, min, touched} */
 const rowName = r => r.key ? t(TASK[r.key].label) : (r.name.trim() || t("exUnnamed"));
 
-/* ==================== BEREGNINGEN ==================== */
+/* ==================== CALCULATION ==================== */
 function calc(){
   const loc     = $("a_loc").value;
   const place   = PLACE[loc] || {km:0, tunnel:"none"};
@@ -1286,13 +1334,15 @@ function calc(){
   const booking = $("a_booking").value;
   const isOnce  = booking === "once", isRecurring = booking === "recurring";
   const deep    = isOnce && $("a_deep").checked;
+  const business= $("a_customer").value === "business";
+  const visit   = deep || business;   /* an on-site visit is required before a final price */
   const freq    = $("a_freq").value;
   const weekday = $("a_weekday").value;
   const time    = $("a_time").value;
   const urgent  = $("a_urgent").checked;
   const linen   = $("a_linen").checked;
 
-  /* arbejdslinjer — tid → pris ved grundsats */
+  /* work lines: minutes -> price at the base rate */
   const lines = [];
   const add = (label, mins) => { if(mins > 0) lines.push({label, min:mins, price:priceOf(mins)}); };
   const cleanMin = pnum($("a_clean").value);
@@ -1310,29 +1360,29 @@ function calc(){
   const workMin   = lines.reduce((a,l) => a + l.min, 0);
   const workPrice = lines.reduce((a,l) => a + l.price, 0);
 
-  /* tillæg på løn: aften/weekend og akut */
+  /* wage surcharges: evening/weekend and urgent */
   const isWeekend  = weekday === "sat" || weekday === "sun";
   const timeHour   = parseInt((time || "0:0").split(":")[0], 10) || 0;
   const isOffHours = isWeekend || timeHour >= 16;
   const upOff      = isOffHours ? Math.max(0, num("s_offhours")) : 0;
   const upUrg      = urgent     ? Math.max(0, num("s_urgent"))   : 0;
-  const upOnce     = isOnce     ? Math.max(0, num("s_oneoff"))   : 0;   /* engangsvask tager længere tid */
+  const upOnce     = isOnce     ? Math.max(0, num("s_oneoff"))   : 0;   /* a one-off clean takes longer */
   const upPct      = upOff + upUrg + upOnce;
   const upliftPrice= Math.round(workPrice * upPct/100);
 
-  /* tunnel med påslag */
+  /* tunnel toll, sold at the margin */
   const tunKey   = place.tunnel;
   const tunCost  = TUNNELS[tunKey] ? TUNNELS[tunKey].cost : 0;
   const tunPrice = Math.round(tunCost / (1 - dg()));
 
   const subtotal = workPrice + upliftPrice + tunPrice;
 
-  /* omkostning */
+  /* cost */
   const wageCost   = workMin / 60 * wage();
   const upliftCost = wageCost * upPct/100;
   const cost       = wageCost + upliftCost + tunCost;
 
-  /* minimumsprisen følger engangstillægget, så engangs også er dyrere på de mindste boliger */
+  /* the minimum price follows the one-off surcharge, so one-off is dearer on small homes too */
   const stairFloor = minFloorEx() * (1 + upOnce/100);
   const fp         = finalPrice(subtotal, cost, stairFloor);
   const minTop     = fp.minTop;
@@ -1344,13 +1394,13 @@ function calc(){
   const dgEff      = total > 0 ? profit / total * 100 : 0;
 
   return {loc, place, size, km, kmRT, roundT, toilets, extraToi, persons, bi, individual,
-          booking, isOnce, isRecurring, deep, freq, weekday, time, urgent, linen,
+          booking, isOnce, isRecurring, deep, business, visit, freq, weekday, time, urgent, linen,
           cleanMin, windows, winMin, lines, workMin, workPrice, isOffHours, upOff, upUrg, upOnce, upPct, upliftPrice,
           tunKey, tunCost, tunPrice, subtotal, minTop, stairFloor, upOnce, rounding, total,
           wageCost, upliftCost, cost, profit, mkEff, dgEff};
 }
 
-/* ==================== VISNING ==================== */
+/* ==================== RENDERING ==================== */
 const vatx = n => state.vat ? n*1.25 : n;
 
 function buildRail(){
@@ -1458,7 +1508,7 @@ function render(){
   $("timeInfo").textContent  = c.isOffHours ? f("offOn",{p:kr(num("s_offhours"))}) : t("offOff");
   $("timeInfo").classList.toggle("est", c.isOffHours);
 
-  /* fliser: kæledyr og ekstraopgaver */
+  /* tiles: pets and extra tasks */
   $("petsPriceLbl").textContent = f("tileInfo",{m:kr(num("s_mPets")), p:pm(num("s_mPets"))});
   $("petsTiles").querySelectorAll(".tile").forEach(el =>
     el.classList.toggle("sel", el.dataset.val === (state.pets ? "yes" : "no")));
@@ -1482,7 +1532,12 @@ function render(){
   $("flagWin").textContent = t("winOver");
   $("flagWin").classList.toggle("on", c.windows > 30);
 
-  $("bigLbl").textContent = state.vat ? t("priceIncl") : t("priceExcl");
+  $("bigLbl").textContent = state.vat ? t("priceGuideIncl") : t("priceGuideExcl");
+  $("customerInfo").textContent = c.business ? t("visitShort") : "\u00a0";
+  $("customerInfo").classList.toggle("est", c.business);
+  const whats = [c.deep ? t("whatDeep") : "", c.business ? t("whatBusiness") : ""].filter(Boolean);
+  $("flagVisit").textContent = c.visit ? f("visitNote",{what:whats.join(" " + t("andWord") + " ")}) : "";
+  $("flagVisit").classList.toggle("on", c.visit);
   $("bigAmt").innerHTML   = kr(vatx(c.total)) + "<small>" + t("kr") + "</small>";
   $("bigAlt").textContent = state.vat ? f("altExcl",{x:kr(c.total)}) : f("altIncl",{x:kr(c.total*1.25)});
 
@@ -1529,7 +1584,7 @@ const kpi  = (k,v,u,cls) => '<div class="kpi"><div class="k">'+k+'</div><div cla
                           + v + (u ? "<small>"+u+"</small>" : "") + "</div></div>";
 const line = (label,val) => "<dt>" + label + "</dt><dd>" + val + "</dd>";
 
-/* ==================== HÆNDELSER ==================== */
+/* ==================== EVENTS ==================== */
 document.querySelectorAll(".panel > h2").forEach(h =>
   h.addEventListener("click", () => h.parentElement.classList.toggle("closed")));
 
@@ -1553,9 +1608,9 @@ $("a_clean").addEventListener("input", () => {
   render();
 });
 ["a_toilets","a_persons","a_time","a_windows"].forEach(id => $(id).addEventListener("input", render));
-["a_booking","a_freq","a_weekday","a_deep","a_urgent","a_linen","a_time"].forEach(id => $(id).addEventListener("change", render));
+["a_customer","a_booking","a_freq","a_weekday","a_deep","a_urgent","a_linen","a_time"].forEach(id => $(id).addEventListener("change", render));
 
-/* standardtider: ændres en standard, følger de valgte opgaver med, medmindre de er rettet på turen */
+/* standard times: changing one updates the selected tasks, unless edited for this job */
 document.querySelectorAll(".rail input").forEach(el => el.addEventListener("input", () => {
   ROWS.forEach(r => { if(r.key && !r.touched) r.min = String(num(TASK[r.key].setting)); });
   if(TASKS.some(x => x.setting === el.id)){
@@ -1566,13 +1621,13 @@ document.querySelectorAll(".rail input").forEach(el => el.addEventListener("inpu
   render();
 }));
 
-/* kæledyr */
+/* pets */
 $("petsTiles").addEventListener("click", e => {
   const b = e.target.closest(".tile"); if(!b) return;
   state.pets = b.dataset.val === "yes"; render();
 });
 
-/* ekstraopgaver: flise til/fra tilføjer eller fjerner en linje */
+/* extra tasks: toggling a tile adds or removes a line */
 $("extrasTiles").addEventListener("click", e => {
   const b = e.target.closest(".tile"); if(!b) return;
   const k = b.dataset.key, i = ROWS.findIndex(r => r.key === k);
@@ -1599,7 +1654,7 @@ $("exRows").addEventListener("click", e => {
   buildRows(); render();
 });
 
-/* --- indsæt km fra Landsverk --- */
+/* --- paste km from Landsverk --- */
 function norm(s){ return s.toLowerCase().replace(/[.,;:]+$/,"").trim(); }
 const NORM = {}; Object.keys(PLACE).forEach(k => NORM[norm(k)] = k);
 
@@ -1644,6 +1699,7 @@ $("printBtn").addEventListener("click", () => window.print());
 $("copyBtn").addEventListener("click", () => {
   const c = last, K = t("kr"), out = [];
   out.push(t("cTitle"));
+  if(c.business) out.push(t("optBusiness"));
   out.push(f("cSpec",{loc:c.loc, s:kr(c.size), km:kr1(c.kmRT), o:kr(c.roundT)}));
   out.push(pl("cToilet",c.toilets));
   if(c.isRecurring) out.push(f("schedRecurring",{f:t({weekly:"optWeekly",biweekly:"optBiweekly",triweekly:"optTriweekly",monthly:"optMonthly"}[c.freq] || "optWeekly"),
@@ -1660,6 +1716,9 @@ $("copyBtn").addEventListener("click", () => {
   if(c.rounding) out.push(t("bdRound") + ": " + sgn(c.rounding) + " " + K);
   out.push(t("totalExcl") + ": " + kr(c.total) + " " + K);
   out.push(t("totalIncl") + ": " + kr(c.total*1.25) + " " + K);
+  out.push(t("cGuide"));
+  if(c.visit){ const wl = [c.deep ? t("whatDeep") : "", c.business ? t("whatBusiness") : ""].filter(Boolean);
+    out.push(f("cVisit",{what:wl.join(" " + t("andWord") + " ")})); }
   out.push("");
   out.push(f("cMargin",{mk:kr(c.mkEff), dg:kr(c.dgEff), x:kr(c.profit)}));
   navigator.clipboard?.writeText(out.join("\n")).then(
@@ -1677,7 +1736,7 @@ $("saveBtn").addEventListener("click", () => {
   const s = {}; SETTINGS.forEach(id => s[id] = $(id).value);
   const blob = new Blob([JSON.stringify({settings:s, km:KM_OVERRIDE, lang}, null, 2)], {type:"application/json"});
   const u = URL.createObjectURL(blob), a = document.createElement("a");
-  a.href = u; a.download = "klart-opsaetning.json";
+  a.href = u; a.download = "klart-settings.json";
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(u), 1000);
 });
