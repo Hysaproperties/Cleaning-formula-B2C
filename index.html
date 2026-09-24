@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <!--
   Klárt (Vaskingen) · Cleaning price calculator, private customers / B2C
-  Version 3.6.0 — 2026-09-23
+  Version 4.0.0 — 2026-09-23
 
-  Time-based pricing: price = wage cost / (1 - gross margin), never below 55 %.
+  Time-based pricing: price = minutes x fixed hourly rate (400 DKK incl. VAT).
+  The wage is 220 DKK/h, so the gross margin is whatever that leaves.
   Everything is priced on expected minutes - cleaning, toilets, deep cleaning,
   bed linen, pets, extra tasks, windows and driving. Tunnel tolls are sold at
   the same margin on top of the actual toll. Evening/weekend, urgent and
@@ -294,7 +295,7 @@ body.locked{overflow:hidden}
       <h2><span data-t="pRate"></span><span class="chev">▾</span></h2>
       <div class="pbody">
         <div class="row"><label data-t="wageL"></label><input type="number" id="s_wage" value="220" min="0"></div>
-        <div class="row"><label data-t="dgL"></label><input type="number" id="s_dg" value="55" min="55" max="95"><span class="unit">%</span></div>
+        <div class="row"><label data-t="rateL"></label><input type="number" id="s_rate" value="400" min="0"><span class="unit">kr.</span></div>
         <p class="note hintbad" id="markupHint"></p>
         <p class="note" style="margin:6px 0 0" id="rateNote"></p>
       </div>
@@ -646,10 +647,10 @@ function winMinutes(n){
   return tier ? num(tier.setting) : num("s_w30") * n / 30;   /* above 30: scaled, individual quote */
 }
 
-/* Hard floors that can never be broken:
-   - the gross margin can never fall below MIN_DG
-   - no job costs less than the standard price for the smallest size        */
-const MIN_DG = 55;           /* the gross margin can never fall below this */
+/* One hard floor: no job costs less than the standard price for the
+   smallest size. The hourly rate is fixed, so the margin follows from it. */
+/* The hourly selling price is fixed (incl. VAT). The gross margin is whatever
+   that leaves after the wage - it is shown, not set.                        */
 const VAT = 1.25;
 
 /* ==================== ROAD DISTANCES ==================== */
@@ -776,15 +777,15 @@ const L = {
   "schedOnce": "Engangs",
   "schedRecurring": "{f} · {d} · {t}",
   "minShort": "min",
-  "lockNote": "Alle priser regnes ud fra lønnen med {d} % dækningsgrad, også kørsel og tunnel. Tiderne følger prisbladet. Engangsvask tager længere tid og koster derfor mere. Prisen rundes altid op til nærmeste 50 kr. inkl. moms.",
+  "lockNote": "Alle priser regnes ud fra tiden gange timeprisen — også kørsel og tunnel. Tiderne følger prisbladet. Engangsvask tager længere tid og koster derfor mere. Prisen rundes altid op til nærmeste 50 kr. inkl. moms.",
   "pBase": "Grundtid efter størrelse",
   "baseNote": "Priser inkl. moms, uden kørsel. Standardvasketid pr. størrelse — arbejde sælges til {r} kr./t.",
   "stdMin": "{m} min standard",
   "tunnelNote": "Priser inkl. moms, tur-retur, med påslag oven på udgiften. Følger automatisk af beliggenheden.",
   "tunCostLbl": "udgift {x} kr.",
-  "pRate": "Løn og dækningsgrad",
+  "pRate": "Løn og timepris",
   "wageL": "Løn, kr./t",
-  "rateNote": "1 time koster {w} kr. i løn og sælges til {r} kr. {d} % dækningsgrad svarer til {m} % påslag.",
+  "rateNote": "1 time koster {w} kr. i løn og sælges til {p} kr. inkl. moms ({r} kr. ekskl.). Det giver {d} % dækningsgrad, altså {m} % påslag.",
   "pTimes": "Standardtider, minutter",
   "timesNote": "Den tid der lægges på, når en opgave vælges. Kan rettes på den enkelte tur.",
   "tToilet": "Toilet ud over det første",
@@ -839,14 +840,12 @@ const L = {
   "mmCost": "Omkostning i alt",
   "mmProfit": "Fortjeneste",
   "foot2": "Grundtiderne og køkkenopgaverne følger prisbladet — midten af hvert tidsinterval. Vinduestiderne er regnet baglæns fra prisbladets vinduespriser. Tiderne for toiletter, hovedrengøring, sengetøj og kæledyr er stadig forslag.",
-  "foot3": "Alle priser ligger på den dækningsgrad der står i venstre spalte, og den kan ikke sættes lavere end {d} %. Laveste pris er standardprisen for den mindste størrelse. Oprundingen til 50 kr. løfter dækningsgraden en smule — aldrig ned.",
+  "foot3": "Prisen er tid gange timepris. Dækningsgraden er det der bliver tilbage, når lønnen er betalt, og står i venstre spalte. Laveste pris er standardprisen for den mindste størrelse. Oprundingen til 50 kr. løfter dækningsgraden en smule.",
   "cSpec": "{loc} · {s} m² · {km} km tur-retur / {o} min",
   "cToilet1": "{n} toilet",
   "cToiletN": "{n} toiletter",
   "cMargin": "Påslag {mk} % · dækningsgrad {dg} % · fortjeneste {x} kr.",
   "bdMin": "Tillæg op til laveste pris",
-  "dgL": "Dækningsgrad, %",
-  "dgHint": "Dækningsgraden kan ikke være under {d} %. Der regnes med {d} %.",
   "oneOffL": "Engangsvask, % på løn",
   "thFast": "Fast aftale",
   "thOnce": "Engangs",
@@ -879,7 +878,9 @@ const L = {
   "priceGuideExcl": "Vejledende pris ekskl. moms",
   "priceGuideIncl": "Vejledende pris inkl. 25 % moms",
   "cVisit": "Vi skal se opgaven, før vi kan give en endelig pris på {what}. Prisen ovenfor er vejledende.",
-  "cGuide": "Vejledende pris. Viser opgaven sig at være mere krævende end forventet, kan prisen ændre sig."
+  "cGuide": "Vejledende pris. Viser opgaven sig at være mere krævende end forventet, kan prisen ændre sig.",
+  "rateL": "Timepris til kunden, inkl. moms",
+  "rateHint": "Timeprisen er lavere end lønnen. Så taber I penge på hver time."
  },
  "en": {
   "appTitle": "Price calculator for private customers",
@@ -966,15 +967,15 @@ const L = {
   "schedOnce": "One-off",
   "schedRecurring": "{f} · {d} · {t}",
   "minShort": "min",
-  "lockNote": "Every price is worked out from the wage at a {d}% gross margin, including driving and tunnels. Times follow the price sheet. A one-off clean takes longer and so costs more. The price is always rounded up to the nearest DKK 50 incl. VAT.",
+  "lockNote": "Every price is minutes times the hourly price - including driving and tunnels. Times follow the price sheet. A one-off clean takes longer and so costs more. The price is always rounded up to the nearest DKK 50 incl. VAT.",
   "pBase": "Base time by size",
-  "baseNote": "Prices incl. VAT, excluding driving. Standard cleaning time per size — work is sold at DKK {r}/h.",
+  "baseNote": "Prices incl. VAT, excluding driving. Standard cleaning time per size - work is sold at DKK {r}/h.",
   "stdMin": "{m} min standard",
   "tunnelNote": "Prices incl. VAT, round trip, with markup on top of the cost. Set automatically by the location.",
   "tunCostLbl": "cost DKK {x}",
-  "pRate": "Wage and gross margin",
+  "pRate": "Wage and hourly price",
   "wageL": "Wage, DKK/h",
-  "rateNote": "One hour costs {w} DKK in wages and sells for {r} DKK. A {d}% gross margin equals a {m}% markup.",
+  "rateNote": "One hour costs {w} DKK in wages and sells for {p} DKK incl. VAT ({r} DKK excl.). That leaves a {d}% gross margin, a {m}% markup.",
   "pTimes": "Standard times, minutes",
   "timesNote": "The time added when a task is selected. Can be changed for the individual job.",
   "tToilet": "Toilet beyond the first",
@@ -1029,14 +1030,12 @@ const L = {
   "mmCost": "Total cost",
   "mmProfit": "Profit",
   "foot2": "Base times and kitchen tasks follow the price sheet — the middle of each time range. Window times are worked backwards from the sheet's window prices. The times for toilets, deep cleaning, bed linen and pets are still proposals.",
-  "foot3": "Every price sits at the gross margin set in the left-hand panel, which cannot go below {d}%. The lowest price is the standard price for the smallest size. Rounding up to DKK 50 lifts the gross margin slightly — never down.",
+  "foot3": "The price is minutes times the hourly price. The gross margin is whatever is left once the wage is paid, and is shown in the left-hand panel. The lowest price is the standard price for the smallest size. Rounding up to DKK 50 lifts the margin slightly.",
   "cSpec": "{loc} · {s} m² · {km} km round trip / {o} min",
   "cToilet1": "{n} toilet",
   "cToiletN": "{n} toilets",
   "cMargin": "Markup {mk}% · gross margin {dg}% · profit DKK {x}",
   "bdMin": "Supplement up to the lowest price",
-  "dgL": "Gross margin, %",
-  "dgHint": "Gross margin cannot be below {d}%. {d}% is used.",
   "oneOffL": "One-off clean, % on wages",
   "thFast": "Regular",
   "thOnce": "One-off",
@@ -1069,7 +1068,9 @@ const L = {
   "priceGuideExcl": "Indicative price excl. VAT",
   "priceGuideIncl": "Indicative price incl. 25% VAT",
   "cVisit": "We need to see the job before we can give a final price for {what}. The price above is indicative.",
-  "cGuide": "Indicative price. If the job turns out to be more demanding than expected, the price may change."
+  "cGuide": "Indicative price. If the job turns out to be more demanding than expected, the price may change.",
+  "rateL": "Hourly price to the customer, incl. VAT",
+  "rateHint": "The hourly price is below the wage. Every hour loses money."
  },
  "fo": {
   "appTitle": "Prísroknari fyri privatkundar",
@@ -1156,15 +1157,15 @@ const L = {
   "schedOnce": "Eingangsvask",
   "schedRecurring": "{f} · {d} · {t}",
   "minShort": "min",
-  "lockNote": "Allir prísir verða roknaðir út frá lønini við {d} % dekningsgrad, eisini koyring og tunlar. Tíðirnar fylgja prísblaðnum. Eingangsvask tekur longri tíð og kostar tí meira. Prísurin verður altíð rundaður upp til næstu 50 kr. við MVG.",
+  "lockNote": "Allir prísir eru tíð gongd við tímaprísin — eisini koyring og tunlar. Tíðirnar fylgja prísblaðnum. Eingangsvask tekur longri tíð og kostar tí meira. Prísurin verður altíð rundaður upp til næstu 50 kr. við MVG.",
   "pBase": "Grundtíð eftir stødd",
   "baseNote": "Prísir við MVG, uttan koyring. Vanlig vasktíð fyri hvørja stødd — arbeiði verður selt fyri {r} kr./t.",
   "stdMin": "{m} min vanligt",
   "tunnelNote": "Prísir við MVG, fram og aftur, við álagningi omaná útreiðsluna. Verður settur sjálvvirkandi eftir staðsetingini.",
   "tunCostLbl": "útreiðsla {x} kr.",
-  "pRate": "Løn og dekningsgrad",
+  "pRate": "Løn og tímaprísur",
   "wageL": "Løn, kr./t",
-  "rateNote": "1 tími kostar {w} kr. í løn og verður seldur fyri {r} kr. {d} % dekningsgrad svarar til {m} % álagning.",
+  "rateNote": "1 tími kostar {w} kr. í løn og verður seldur fyri {p} kr. við MVG ({r} kr. uttan). Tað gevur {d} % dekningsgrad, t.e. {m} % álagning.",
   "pTimes": "Vanligar tíðir, minuttir",
   "timesNote": "Tíðin sum verður løgd afturat, tá ein uppgáva verður vald. Kann rættast fyri einstaka túrin.",
   "tToilet": "Vesi umframt tað fyrsta",
@@ -1219,14 +1220,12 @@ const L = {
   "mmCost": "Kostnaður tilsamans",
   "mmProfit": "Vinningur",
   "foot2": "Grundtíðirnar og køksuppgávurnar fylgja prísblaðnum — miðjuna av hvørjum tíðarbili. Vindeygnatíðirnar eru roknaðar aftureftir úr vindeygnaprísunum á prísblaðnum. Tíðirnar fyri vesi, høvuðsreingerð, rúmfatnað og djór eru enn uppskot.",
-  "foot3": "Allir prísir liggja á tí dekningsgrad, sum stendur í vinstru spaltuni, og hon kann ikki setast lægri enn {d} %. Lægsti prísurin er vanligi prísurin fyri minstu støddina. Upprundingin til 50 kr. lyftir dekningsgradina eitt sindur — ongantíð niður.",
+  "foot3": "Prísurin er tíð gongd við tímaprísin. Dekningsgradin er tað, sum verður eftir, tá lønin er goldin, og stendur í vinstru spaltuni. Lægsti prísurin er vanligi prísurin fyri minstu støddina. Upprundingin til 50 kr. lyftir dekningsgradina eitt sindur.",
   "cSpec": "{loc} · {s} m² · {km} km fram og aftur / {o} min",
   "cToilet1": "{n} vesi",
   "cToiletN": "{n} vesi",
   "cMargin": "Álagningur {mk} % · dekningsgrad {dg} % · vinningur {x} kr.",
   "bdMin": "Tillegg upp í lægsta prís",
-  "dgL": "Dekningsgrad, %",
-  "dgHint": "Dekningsgradin kann ikki vera undir {d} %. Roknað verður við {d} %.",
   "oneOffL": "Eingangsvask, % á løn",
   "thFast": "Føst avtala",
   "thOnce": "Eingangs",
@@ -1259,7 +1258,9 @@ const L = {
   "priceGuideExcl": "Vegleiðandi prísur uttan MVG",
   "priceGuideIncl": "Vegleiðandi prísur við 25 % MVG",
   "cVisit": "Vit mugu síggja uppgávuna, áðrenn vit kunnu geva endaligan prís á {what}. Prísurin omanfyri er vegleiðandi.",
-  "cGuide": "Vegleiðandi prísur. Vísir uppgávan seg at vera meira krevjandi enn væntað, kann prísurin broytast."
+  "cGuide": "Vegleiðandi prísur. Vísir uppgávan seg at vera meira krevjandi enn væntað, kann prísurin broytast.",
+  "rateL": "Tímaprísur til kundan, við MVG",
+  "rateHint": "Tímaprísurin er lægri enn lønin. So tapa tit pening á hvørjum tíma."
  }
 };
 
@@ -1285,20 +1286,21 @@ const minsOf = km  => { const s = num("s_speed") || 1; return Math.round(km / s 
 
 /* --- rates --- */
 const wage    = () => Math.max(0, num("s_wage"));
-const dg      = () => Math.min(95, Math.max(MIN_DG, num("s_dg"))) / 100;   /* gross margin, never below MIN_DG */
-const markup  = () => dg() / (1 - dg());                                    /* the markup that produces that gross margin */
-const sellMin = () => wage() / 60 / (1 - dg());                             /* selling price per minute, before surcharges */
+const rateInc = () => Math.max(0, num("s_rate"));          /* hourly price charged, incl. VAT */
+const rateEx  = () => rateInc() / VAT;                      /* the same, excl. VAT */
+const sellMin = () => rateEx() / 60;                        /* selling price per minute, before surcharges */
+const dg      = () => rateEx() > 0 ? 1 - wage() / rateEx() : 0;   /* resulting gross margin */
+const markup  = () => wage() > 0 ? (rateEx() - wage()) / wage() : 0;
 /* Lowest price: the standard price for the smallest size, at the same margin. */
 const minFloorEx = () => STD[0].min * sellMin();
 
-/* Final price: lift to the floor (minimum margin / minimum price), then round
-   UP to the nearest DKK 50 incl. VAT, never below the minimum price.           */
+/* Final price: lift to the minimum price, then round UP to the nearest
+   DKK 50 incl. VAT. Everything is priced at the fixed hourly rate.        */
 function finalPrice(subtotal, cost, stairFloor){
-  const dgFloor = cost / (1 - MIN_DG/100);
   const minTop  = Math.max(0, stairFloor - subtotal);
-  const base    = Math.max(subtotal + minTop, dgFloor);
+  const base    = subtotal + minTop;
   const raw     = Math.round(base * VAT * 100) / 100;
-  let inc       = Math.ceil(raw / 50 - 1e-9) * 50;       /* always up, so the margin never drops */
+  let inc       = Math.ceil(raw / 50 - 1e-9) * 50;       /* always up */
   const minIncl = Math.round(Math.round(stairFloor * VAT * 100) / 100 / 50) * 50;   /* lowest list price */
   if(inc < minIncl) inc = minIncl;
   return {minTop, total: inc / VAT, totalIncl: inc};
@@ -1373,7 +1375,7 @@ function calc(){
   /* tunnel toll, sold at the margin */
   const tunKey   = place.tunnel;
   const tunCost  = TUNNELS[tunKey] ? TUNNELS[tunKey].cost : 0;
-  const tunPrice = Math.round(tunCost / (1 - dg()));
+  const tunPrice = dg() > 0 ? Math.round(tunCost / (1 - dg())) : tunCost;   /* same margin as the work */
 
   const subtotal = workPrice + upliftPrice + tunPrice;
 
@@ -1407,9 +1409,9 @@ function buildRail(){
   const mk = markup();
   $("lockNote").textContent = f("lockNote",{d:kr(dg()*100)});
   $("baseNote").textContent = f("baseNote",{r:kr(sellMin()*60*VAT)});
-  $("markupHint").textContent = num("s_dg") < MIN_DG ? f("dgHint",{d:MIN_DG}) : "";
+  $("markupHint").textContent = rateEx() <= wage() ? t("rateHint") : "";
   WIN.forEach(w => $("lbl_" + w.setting).textContent = f("winRange",{a:w.min, b:w.max}));
-  $("rateNote").textContent = f("rateNote",{w:kr(wage()), r:kr(sellMin()*60), d:kr(dg()*100), m:kr(mk*100)});
+  $("rateNote").textContent = f("rateNote",{p:kr(rateInc()), r:kr(rateEx()), w:kr(wage()), d:kr1(dg()*100), m:kr(mk*100)});
 
   const up = Math.max(0, num("s_oneoff"));
   let h = '<tr class="thead"><td></td><td>' + t("thFast") + "</td><td>" + t("thOnce") + "</td></tr>";
@@ -1468,7 +1470,7 @@ function applyLang(){
   document.querySelectorAll("[data-t]").forEach(el => el.textContent = t(el.dataset.t));
   $("driveNote").textContent = t("driveNote");
   $("foot1").innerHTML = t("foot1");
-  $("foot3").textContent = f("foot3",{d:MIN_DG});
+  $("foot3").textContent = t("foot3");
   $("vatBtn").textContent   = state.vat ? t("showExcl") : t("showIncl");
   $("copyBtn").textContent  = t("copy");
   $("saveBtn").textContent  = t("save");
@@ -1730,7 +1732,7 @@ function flash(msg){
   setTimeout(() => { b.textContent = t("copy"); b.classList.remove("on"); }, 1800);
 }
 
-const SETTINGS = ["s_wage","s_dg","s_mToilet","s_mDeep","s_mLinen","s_mPets","s_mFridge","s_mFreezer","s_mFridgeFreezer","s_mDefrost",
+const SETTINGS = ["s_wage","s_rate","s_mToilet","s_mDeep","s_mLinen","s_mPets","s_mFridge","s_mFreezer","s_mFridgeFreezer","s_mDefrost",
                   "s_mOven","s_mCabinets","s_mExtraDeep","s_w5","s_w10","s_w15","s_w20","s_w30","s_offhours","s_urgent","s_oneoff","s_speed"];
 $("saveBtn").addEventListener("click", () => {
   const s = {}; SETTINGS.forEach(id => s[id] = $(id).value);
